@@ -69,6 +69,10 @@ class OverviewAnalytics(BaseModel):
     recent_sessions: List[StudySession] = []
 
 
+# Alias for compatibility
+AnalyticsOverview = OverviewAnalytics
+
+
 class TopicAnalytics(BaseModel):
     """Schema for topic analytics"""
     topics: List[TopicPerformance]
@@ -96,6 +100,10 @@ class StudyProgress(BaseModel):
     goal_completion_rate: float
 
 
+# Alias for compatibility
+StudyProgressResponse = StudyProgress
+
+
 class QuestionAnalytics(BaseModel):
     """Schema for most missed questions"""
     question_id: int
@@ -106,6 +114,12 @@ class QuestionAnalytics(BaseModel):
     accuracy: float
     topic: Optional[str]
     source_document: Optional[str]
+
+
+class MissedQuestionsResponse(BaseModel):
+    """Schema for missed questions response"""
+    questions: List[QuestionAnalytics]
+    total: int
 
 
 class CardAnalytics(BaseModel):
@@ -138,3 +152,7 @@ class AnalyticsDashboard(BaseModel):
     most_missed_questions: List[QuestionAnalytics]
     struggling_cards: List[CardAnalytics]
     suggestions: List[ImprovementSuggestion]
+
+
+# Alias for compatibility (plural version)
+ImprovementSuggestions = List[ImprovementSuggestion]

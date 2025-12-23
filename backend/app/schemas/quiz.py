@@ -138,6 +138,10 @@ class QuizAnswerSubmit(BaseModel):
     time_spent_seconds: Optional[int] = None
 
 
+# Alias for compatibility
+AnswerSubmission = QuizAnswerSubmit
+
+
 class QuizAttemptResponse(BaseModel):
     """Schema for quiz attempt response"""
     id: int
@@ -196,6 +200,10 @@ class QuizResultResponse(BaseModel):
     
     # Questions with answers
     questions: List[dict] = []
+
+
+# Alias for compatibility
+AttemptResultResponse = QuizResultResponse
 
 
 class QuizFollowUpRequest(BaseModel):
