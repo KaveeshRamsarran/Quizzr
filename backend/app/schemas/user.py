@@ -49,17 +49,25 @@ class UserResponse(BaseModel):
     id: int
     email: str
     name: str
-    school: Optional[str]
+    school: Optional[str] = None
     timezone: str
-    preferred_difficulty: int
-    study_goal_days: Optional[int]
-    simple_mode: bool
+    preferred_difficulty: int = 3
+    study_goal_days: Optional[int] = None
+    simple_mode: bool = False
     role: str
-    is_verified: bool
-    study_streak: int
-    total_study_time_minutes: int
+    is_verified: bool = False
+    study_streak: int = 0
+    total_study_time_minutes: int = 0
     created_at: datetime
-    last_login: Optional[datetime]
+    last_login: Optional[datetime] = None
+    
+    @field_validator("role", mode="before")
+    @classmethod
+    def convert_role_to_str(cls, v):
+        """Convert enum to string if needed"""
+        if hasattr(v, "value"):
+            return v.value
+        return v
     
     class Config:
         from_attributes = True

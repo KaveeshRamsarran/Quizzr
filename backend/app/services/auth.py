@@ -57,6 +57,16 @@ class AuthService:
         expires = datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days)
         return token, expires
     
+    def create_tokens(self, user: User) -> dict:
+        """Create both access and refresh tokens for a user"""
+        access_token = self.create_access_token(user.id)
+        refresh_token, refresh_expires = self.create_refresh_token()
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "refresh_expires": refresh_expires
+        }
+    
     @staticmethod
     def decode_access_token(token: str) -> Optional[int]:
         """Decode and validate an access token, return user_id if valid"""
@@ -146,29 +156,31 @@ class AuthService:
             return None
         return user
     
-    async def login(self, login_data: UserLogin) -> Optional[TokenResponse]:
-        """Login user and return tokens"""
-        user = await self.authenticate_user(login_data)
+    async def login(
+        self, 
+        email: str, 
+        password: str, 
+        ip_address: Optional[str] = None
+    ) -> Optional[tuple[User, dict]]:
+        """Login user and return user with tokens"""
+        user = await self.get_user_by_email(email)
         if not user:
+            return None
+        if not self.verify_password(password, user.hashed_password):
+            return None
+        if not user.is_active:
             return None
         
         # Create tokens
-        access_token = self.create_access_token(user.id)
-        refresh_token, refresh_expires = self.create_refresh_token()
+        tokens = self.create_tokens(user)
         
         # Store refresh token
-        user.refresh_token = refresh_token
-        user.refresh_token_expires = refresh_expires
+        user.refresh_token = tokens["refresh_token"]
+        user.refresh_token_expires = tokens["refresh_expires"]
         user.last_login = datetime.utcnow()
         await self.db.flush()
         
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
-            expires_in=settings.access_token_expire_minutes * 60,
-            user=UserResponse.model_validate(user)
-        )
+        return user, tokens
     
     async def refresh_tokens(self, refresh_token: str) -> Optional[TokenResponse]:
         """Refresh access token using refresh token"""
