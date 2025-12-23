@@ -111,7 +111,7 @@ class AuthService:
         await self.db.refresh(user)
         return user
     
-    async def create_guest_user(self) -> User:
+    async def create_guest_user(self) -> tuple[User, dict]:
         """Create a temporary guest user"""
         # Generate unique guest email
         guest_id = secrets.token_hex(8)
@@ -129,7 +129,11 @@ class AuthService:
         self.db.add(user)
         await self.db.flush()
         await self.db.refresh(user)
-        return user
+        
+        # Generate tokens for the guest user
+        tokens = self.create_tokens(user)
+        
+        return user, tokens
     
     async def authenticate_user(self, login_data: UserLogin) -> Optional[User]:
         """Authenticate a user with email and password"""

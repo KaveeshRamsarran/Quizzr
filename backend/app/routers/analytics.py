@@ -18,7 +18,7 @@ from app.schemas.analytics import (
 from app.services.analytics import AnalyticsService
 from app.routers.dependencies import get_current_user
 
-router = APIRouter(prefix="/analytics", tags=["Analytics"])
+router = APIRouter(tags=["Analytics"])
 
 
 @router.get("/overview", response_model=AnalyticsOverview)

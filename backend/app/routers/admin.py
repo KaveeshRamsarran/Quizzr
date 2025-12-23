@@ -19,7 +19,7 @@ from app.models.job import ProcessingJob, JobStatus
 from app.schemas.user import UserResponse
 from app.routers.dependencies import get_admin_user
 
-router = APIRouter(prefix="/admin", tags=["Admin"])
+router = APIRouter(tags=["Admin"])
 
 
 @router.get("/stats")

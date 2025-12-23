@@ -26,7 +26,7 @@ from app.services.document import DocumentService
 from app.routers.dependencies import get_current_user
 from app.tasks import process_document_task
 
-router = APIRouter(prefix="/documents", tags=["Documents"])
+router = APIRouter(tags=["Documents"])
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)

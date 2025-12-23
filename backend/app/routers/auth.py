@@ -19,7 +19,7 @@ from app.schemas.user import (
 from app.services.auth import AuthService
 from app.routers.dependencies import get_current_user, security
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(tags=["Authentication"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)

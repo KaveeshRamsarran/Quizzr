@@ -23,7 +23,7 @@ from app.schemas.quiz import (
 from app.services.quiz import QuizService
 from app.routers.dependencies import get_current_user
 
-router = APIRouter(prefix="/quizzes", tags=["Quizzes"])
+router = APIRouter(tags=["Quizzes"])
 
 
 @router.post("/", response_model=QuizResponse, status_code=status.HTTP_201_CREATED)

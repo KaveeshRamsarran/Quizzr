@@ -23,7 +23,7 @@ from app.services.deck import DeckService
 from app.services.spaced_repetition import SpacedRepetitionService
 from app.routers.dependencies import get_current_user
 
-router = APIRouter(prefix="/decks", tags=["Decks"])
+router = APIRouter(tags=["Decks"])
 
 
 @router.post("/", response_model=DeckResponse, status_code=status.HTTP_201_CREATED)

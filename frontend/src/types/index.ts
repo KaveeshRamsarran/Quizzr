@@ -2,16 +2,18 @@
 export interface User {
   id: number
   email: string
-  display_name: string | null
-  role: 'free' | 'premium' | 'admin'
-  is_guest: boolean
+  name: string
+  school: string | null
+  timezone: string
+  preferred_difficulty: number
+  study_goal_days: number | null
+  simple_mode: boolean
+  role: 'standard' | 'admin' | 'guest'
   is_verified: boolean
-  preferences: UserPreferences
-  current_streak: number
-  longest_streak: number
-  total_cards_studied: number
-  total_quizzes_taken: number
+  study_streak: number
+  total_study_time_minutes: number
   created_at: string
+  last_login: string | null
 }
 
 export interface UserPreferences {

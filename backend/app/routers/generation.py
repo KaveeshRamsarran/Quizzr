@@ -23,7 +23,7 @@ from app.schemas.quiz import QuizResponse
 from app.routers.dependencies import get_current_user
 from app.tasks import generate_deck_task, generate_quiz_task
 
-router = APIRouter(prefix="/generate", tags=["Generation"])
+router = APIRouter(tags=["Generation"])
 
 
 @router.post("/deck", response_model=GenerationJobResponse, status_code=status.HTTP_202_ACCEPTED)

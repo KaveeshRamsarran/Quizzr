@@ -105,7 +105,7 @@ export default function Landing() {
               to="/register"
               className="btn-primary text-lg px-8 py-3"
             >
-              Start Free Trial
+              Get Started
               <ArrowRightIcon className="w-5 h-5 ml-2" />
             </Link>
             <Link

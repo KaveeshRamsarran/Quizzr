@@ -101,5 +101,10 @@ class User(Base):
         cascade="all, delete-orphan"
     )
     
+    @property
+    def is_guest(self) -> bool:
+        """Check if user is a guest account"""
+        return self.role == UserRole.GUEST
+    
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
