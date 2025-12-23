@@ -73,7 +73,7 @@ export default function Layout() {
                     <UserCircleIcon className="w-6 h-6 text-primary-600" />
                   </div>
                   <span className="hidden sm:block text-sm font-medium text-gray-700">
-                    {user?.display_name || user?.email?.split('@')[0] || 'User'}
+                    {user?.name || user?.email?.split('@')[0] || 'User'}
                   </span>
                 </Menu.Button>
 

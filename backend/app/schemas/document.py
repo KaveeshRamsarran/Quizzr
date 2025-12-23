@@ -5,7 +5,7 @@ Request and response models for document-related endpoints
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 
 class DocumentUploadResponse(BaseModel):
@@ -79,6 +79,13 @@ class DocumentResponse(BaseModel):
     chunk_count: int = 0
     deck_count: int = 0
     quiz_count: int = 0
+    
+    @field_serializer('style', 'status')
+    def serialize_enum(self, value):
+        """Convert enum to string"""
+        if hasattr(value, 'value'):
+            return value.value
+        return str(value) if value else None
     
     class Config:
         from_attributes = True

@@ -207,7 +207,7 @@ class AnalyticsService:
         
         return sessions
     
-    async def get_topic_analytics(self, user_id: int) -> dict:
+    async def get_topic_analytics(self, user_id: int, course_id: Optional[int] = None) -> dict:
         """Get performance analytics by topic"""
         # Get question performance by topic
         result = await self.db.execute(
@@ -262,17 +262,10 @@ class AnalyticsService:
     async def get_study_progress(
         self,
         user_id: int,
-        period: str = "week"
+        days: int = 30
     ) -> dict:
         """Get study progress over time"""
         now = datetime.utcnow()
-        
-        if period == "week":
-            days = 7
-        elif period == "month":
-            days = 30
-        else:
-            days = 365
         
         daily_stats = []
         accuracy_trend = []
@@ -350,6 +343,16 @@ class AnalyticsService:
             "daily_goal": 20,  # Could be configurable
             "goal_completion_rate": min(100, (this_week_cards / (20 * 7)) * 100) if this_week_cards else 0
         }
+    
+    async def get_missed_questions(
+        self,
+        user_id: int,
+        course_id: Optional[int] = None,
+        limit: int = 10
+    ) -> dict:
+        """Get most frequently missed questions"""
+        questions = await self.get_most_missed_questions(user_id, limit)
+        return {"questions": questions}
     
     async def get_most_missed_questions(
         self,

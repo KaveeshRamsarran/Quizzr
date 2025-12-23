@@ -19,26 +19,36 @@ export default function Dashboard() {
   const { data: overview } = useQuery({
     queryKey: ['analytics', 'overview'],
     queryFn: analyticsApi.getOverview,
+    retry: false,
+    staleTime: 30000,
   })
 
   const { data: documents } = useQuery({
     queryKey: ['documents', { limit: 5 }],
     queryFn: () => documentsApi.list({ limit: 5 }),
+    retry: false,
+    staleTime: 30000,
   })
 
   const { data: decks } = useQuery({
     queryKey: ['decks', { limit: 5 }],
     queryFn: () => decksApi.list({ limit: 5 }),
+    retry: false,
+    staleTime: 30000,
   })
 
   const { data: quizzes } = useQuery({
     queryKey: ['quizzes', { limit: 5 }],
     queryFn: () => quizzesApi.list({ limit: 5 }),
+    retry: false,
+    staleTime: 30000,
   })
 
   const { data: cardsDue } = useQuery({
     queryKey: ['analytics', 'cards-due'],
     queryFn: analyticsApi.getCardsDue,
+    retry: false,
+    staleTime: 30000,
   })
 
   const stats = [
@@ -74,7 +84,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Welcome back, {user?.display_name || user?.email?.split('@')[0] || 'Student'}!
+            Welcome back, {user?.name || user?.email?.split('@')[0] || 'Student'}!
           </h1>
           <p className="mt-1 text-gray-600">
             {overview?.study_streak ? (

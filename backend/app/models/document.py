@@ -124,6 +124,21 @@ class Document(Base):
         back_populates="source_document"
     )
     
+    @property
+    def chunk_count(self) -> int:
+        """Get count of chunks"""
+        return len(self.chunks) if self.chunks else 0
+    
+    @property
+    def deck_count(self) -> int:
+        """Get count of decks"""
+        return len(self.decks) if self.decks else 0
+    
+    @property
+    def quiz_count(self) -> int:
+        """Get count of quizzes"""
+        return len(self.quizzes) if self.quizzes else 0
+    
     def __repr__(self) -> str:
         return f"<Document(id={self.id}, filename={self.original_filename}, status={self.status})>"
 

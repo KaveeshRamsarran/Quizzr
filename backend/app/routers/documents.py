@@ -42,8 +42,13 @@ async def upload_document(
     """
     doc_service = DocumentService(session)
     
+    # Get file size
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    
     # Validate file
-    is_valid, error = doc_service.validate_file(file)
+    is_valid, error = doc_service.validate_file(file.filename, file_size)
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -56,13 +61,8 @@ async def upload_document(
     )
     current_usage = total_size.scalar() or 0
     
-    # Seek to get file size
-    file.file.seek(0, 2)
-    file_size = file.file.tell()
-    file.file.seek(0)
-    
     max_storage = 500 * 1024 * 1024  # 500MB for free users
-    if current_user.role.value == "premium":
+    if current_user.role == "premium":
         max_storage = 5 * 1024 * 1024 * 1024  # 5GB for premium
     
     if current_usage + file_size > max_storage:
@@ -86,18 +86,24 @@ async def upload_document(
                 detail="Course not found"
             )
     
-    # Save file
-    file_path = await doc_service.save_file(file, current_user.id)
+    # Read file content
+    content = await file.read()
+    file.file.seek(0)
+    
+    # Generate filename and compute hash
+    filename = doc_service.generate_filename(file.filename, current_user.id)
+    file_hash = doc_service.compute_file_hash(content)
+    file_path = await doc_service.save_file(content, filename)
     
     # Create document record
     document = Document(
         user_id=current_user.id,
         course_id=course_id,
-        filename=file.filename,
+        filename=filename,
         original_filename=file.filename,
         file_path=file_path,
         file_size=file_size,
-        mime_type=file.content_type,
+        file_hash=file_hash,
         status=DocumentStatus.PENDING
     )
     
@@ -108,16 +114,22 @@ async def upload_document(
     # Create processing job
     job = ProcessingJob(
         user_id=current_user.id,
-        job_type=JobType.DOCUMENT_PROCESSING,
-        status=JobStatus.PENDING,
-        metadata={"document_id": document.id}
+        job_type=JobType.PDF_EXTRACTION,
+        document_id=document.id,
+        status=JobStatus.PENDING
     )
     session.add(job)
     await session.commit()
     await session.refresh(job)
     
-    # Queue processing task
-    process_document_task.delay(document.id, job.id)
+    # Queue processing task (runs in background with mocked Celery)
+    try:
+        process_document_task.delay(job.id)
+    except Exception as e:
+        # If task fails to queue, mark job as failed
+        job.status = JobStatus.FAILED
+        job.error_message = f"Failed to queue task: {str(e)}"
+        await session.commit()
     
     return DocumentResponse.model_validate(document)
 
