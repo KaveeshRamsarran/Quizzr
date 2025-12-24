@@ -7,6 +7,7 @@ import enum
 from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import String, DateTime, Integer, ForeignKey, Text, Boolean, Enum, JSON
+from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -127,16 +128,25 @@ class Document(Base):
     @property
     def chunk_count(self) -> int:
         """Get count of chunks"""
+        state = inspect(self)
+        if "chunks" in state.unloaded:
+            return 0
         return len(self.chunks) if self.chunks else 0
     
     @property
     def deck_count(self) -> int:
         """Get count of decks"""
+        state = inspect(self)
+        if "decks" in state.unloaded:
+            return 0
         return len(self.decks) if self.decks else 0
     
     @property
     def quiz_count(self) -> int:
         """Get count of quizzes"""
+        state = inspect(self)
+        if "quizzes" in state.unloaded:
+            return 0
         return len(self.quizzes) if self.quizzes else 0
     
     def __repr__(self) -> str:

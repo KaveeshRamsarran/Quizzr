@@ -82,6 +82,24 @@ class AuthService:
             return int(user_id) if user_id else None
         except JWTError:
             return None
+
+    @staticmethod
+    def verify_access_token(token: str) -> Optional[dict]:
+        """Decode and validate an access token, returning the JWT payload."""
+        try:
+            payload = jwt.decode(
+                token,
+                settings.secret_key,
+                algorithms=[settings.jwt_algorithm],
+            )
+            if payload.get("type") != "access":
+                return None
+            # Ensure required claims exist
+            if not payload.get("sub"):
+                return None
+            return payload
+        except JWTError:
+            return None
     
     async def get_user_by_email(self, email: str) -> Optional[User]:
         """Get user by email"""

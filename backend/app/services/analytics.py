@@ -266,6 +266,14 @@ class AnalyticsService:
     ) -> dict:
         """Get study progress over time"""
         now = datetime.utcnow()
+
+        # Map days to a period label expected by the response schema
+        if days <= 7:
+            period = "week"
+        elif days <= 30:
+            period = "month"
+        else:
+            period = "all_time"
         
         daily_stats = []
         accuracy_trend = []
@@ -304,7 +312,8 @@ class AnalyticsService:
             if acc.total and acc.total > 0:
                 accuracy = round((acc.correct / acc.total) * 100, 1)
             else:
-                accuracy = None
+                # Keep trend lists numeric for empty/new users
+                accuracy = 0.0
             
             daily_stats.append({
                 "date": day_date.isoformat(),
@@ -330,11 +339,14 @@ class AnalyticsService:
         )
         last_week_acc = sum(accuracy_trend[-14:-7]) / 7 if len(accuracy_trend) >= 14 else 0
         
+        # Limit response size to requested window (bounded to 365)
+        window = max(7, min(int(days), 365))
+
         return {
             "period": period,
-            "daily_stats": daily_stats[-30:],  # Limit response size
-            "accuracy_trend": accuracy_trend[-30:],
-            "volume_trend": volume_trend[-30:],
+            "daily_stats": daily_stats[-window:],
+            "accuracy_trend": accuracy_trend[-window:],
+            "volume_trend": volume_trend[-window:],
             "this_week_vs_last": {
                 "cards": this_week_cards - last_week_cards,
                 "accuracy": round(this_week_acc - last_week_acc, 1),
@@ -352,7 +364,7 @@ class AnalyticsService:
     ) -> dict:
         """Get most frequently missed questions"""
         questions = await self.get_most_missed_questions(user_id, limit)
-        return {"questions": questions}
+        return {"questions": questions, "total": len(questions)}
     
     async def get_most_missed_questions(
         self,

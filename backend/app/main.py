@@ -93,6 +93,7 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
+    from datetime import datetime
     error_trace = traceback.format_exc()
     logger.error(
         "Unhandled exception",
@@ -104,6 +105,21 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
     print(f"ERROR: {type(exc).__name__}: {str(exc)}")
     print(f"TRACEBACK:\n{error_trace}")
+
+    # Also write to a local log file to make debugging easier in dev
+    try:
+        log_dir = os.path.join(os.path.dirname(__file__), "..", "..", "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "errors.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write("\n" + "=" * 80 + "\n")
+            f.write(f"[{datetime.utcnow().isoformat()}Z] {request.method} {request.url.path}\n")
+            f.write(f"{type(exc).__name__}: {str(exc)}\n")
+            f.write(error_trace)
+    except Exception:
+        # Never fail the request due to logging issues
+        pass
+
     return JSONResponse(
         status_code=500,
         content={"detail": "An internal error occurred. Please try again later."},
