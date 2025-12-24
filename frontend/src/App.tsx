@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Upload from './pages/Upload'
+import Documents from './pages/Documents'
 import DocumentView from './pages/DocumentView'
 import DeckView from './pages/DeckView'
 import StudyMode from './pages/StudyMode'
@@ -56,6 +57,7 @@ export default function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/upload" element={<Upload />} />
+        <Route path="/documents" element={<Documents />} />
         <Route path="/documents/:id" element={<DocumentView />} />
         <Route path="/decks/:id" element={<DeckView />} />
         <Route path="/decks/:id/study" element={<StudyMode />} />

@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import (
     UserCreate, UserLogin, UserResponse, UserUpdate,
     TokenResponse, TokenRefresh, PasswordChange
@@ -174,30 +174,40 @@ async def update_current_user(
     """
     Update current user's profile
     """
-    # Update allowed fields
-    if user_data.display_name is not None:
-        current_user.display_name = user_data.display_name
-    
+    if user_data.name is not None:
+        current_user.name = user_data.name
+
     if user_data.email is not None and user_data.email != current_user.email:
-        # Check if new email is available
         auth_service = AuthService(session)
         existing = await auth_service.get_user_by_email(user_data.email)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already in use"
+                detail="Email already in use",
             )
         current_user.email = user_data.email
-        current_user.is_verified = False  # Require re-verification
-    
-    if user_data.preferences is not None:
-        current_user.preferences = user_data.preferences
-    
+        current_user.is_verified = False
+
+    if user_data.school is not None:
+        current_user.school = user_data.school
+
+    if user_data.timezone is not None:
+        current_user.timezone = user_data.timezone
+
+    if user_data.preferred_difficulty is not None:
+        current_user.preferred_difficulty = user_data.preferred_difficulty
+
+    if user_data.study_goal_days is not None:
+        current_user.study_goal_days = user_data.study_goal_days
+
+    if user_data.simple_mode is not None:
+        current_user.simple_mode = user_data.simple_mode
+
     current_user.updated_at = datetime.utcnow()
-    
+
     await session.commit()
     await session.refresh(current_user)
-    
+
     return UserResponse.model_validate(current_user)
 
 
@@ -215,7 +225,7 @@ async def change_password(
     # Verify current password
     if not auth_service.verify_password(
         password_data.current_password,
-        current_user.password_hash
+        current_user.hashed_password,
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -223,7 +233,7 @@ async def change_password(
         )
     
     # Update password
-    current_user.password_hash = auth_service.hash_password(password_data.new_password)
+    current_user.hashed_password = auth_service.hash_password(password_data.new_password)
     current_user.updated_at = datetime.utcnow()
     
     await session.commit()
@@ -257,10 +267,10 @@ async def convert_guest_to_user(
         )
     
     # Update guest account
-    current_user.email = user_data.email
-    current_user.password_hash = auth_service.hash_password(user_data.password)
-    current_user.display_name = user_data.display_name
-    current_user.is_guest = False
+    current_user.email = user_data.email.lower()
+    current_user.hashed_password = auth_service.hash_password(user_data.password)
+    current_user.name = user_data.name
+    current_user.role = UserRole.STANDARD
     current_user.updated_at = datetime.utcnow()
     
     await session.commit()

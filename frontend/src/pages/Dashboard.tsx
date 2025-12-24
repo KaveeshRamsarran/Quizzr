@@ -148,7 +148,7 @@ export default function Dashboard() {
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Recent Documents</h3>
-              <Link to="/upload" className="text-sm text-primary-600 hover:text-primary-700">
+              <Link to="/documents" className="text-sm text-primary-600 hover:text-primary-700">
                 View all
               </Link>
             </div>

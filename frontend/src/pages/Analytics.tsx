@@ -26,10 +26,22 @@ import { analyticsApi } from '../lib/api'
 const COLORS = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444']
 
 export default function Analytics() {
-  const { data: analytics, isLoading } = useQuery({
-    queryKey: ['analytics'],
-    queryFn: analyticsApi.get,
+  const { data: overview, isLoading: isOverviewLoading } = useQuery({
+    queryKey: ['analytics', 'overview'],
+    queryFn: analyticsApi.getOverview,
   })
+
+  const { data: progress, isLoading: isProgressLoading } = useQuery({
+    queryKey: ['analytics', 'progress', 30],
+    queryFn: () => analyticsApi.getProgress(30),
+  })
+
+  const { data: topics, isLoading: isTopicsLoading } = useQuery({
+    queryKey: ['analytics', 'topics'],
+    queryFn: () => analyticsApi.getTopics(),
+  })
+
+  const isLoading = isOverviewLoading || isProgressLoading || isTopicsLoading
 
   if (isLoading) {
     return (
@@ -39,30 +51,40 @@ export default function Analytics() {
     )
   }
 
-  if (!analytics) return null
+  if (!overview || !progress) return null
 
   const studyActivityData =
-    analytics.study_activity?.map((item: { date: string; cards_studied: number }) => ({
+    progress.daily_stats?.map((item) => ({
       date: new Date(item.date).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
       }),
-      cards: item.cards_studied,
+      cards: item.cards,
     })) || []
 
   const topicMasteryData =
-    analytics.topic_mastery?.map(
-      (item: { tag_name: string; mastery_percentage: number }) => ({
-        name: item.tag_name,
-        mastery: item.mastery_percentage,
-      })
-    ) || []
+    topics?.topics?.map((item) => ({
+      name: item.topic,
+      mastery: item.accuracy,
+    })) || []
 
-  const difficultyDistribution = [
-    { name: 'Easy', value: analytics.card_difficulty?.easy || 0 },
-    { name: 'Medium', value: analytics.card_difficulty?.medium || 0 },
-    { name: 'Hard', value: analytics.card_difficulty?.hard || 0 },
+  const cardStatusDistribution = [
+    { name: 'New', value: overview.cards_new || 0 },
+    { name: 'Learning', value: overview.cards_learning || 0 },
+    { name: 'Mastered', value: overview.cards_mastered || 0 },
   ]
+
+  const strongestTopic = topics?.topics?.length
+    ? topics.topics.reduce((best, cur) => (cur.accuracy > best.accuracy ? cur : best)).topic
+    : null
+
+  const weakestTopic = topics?.topics?.length
+    ? topics.topics.reduce((worst, cur) => (cur.accuracy < worst.accuracy ? cur : worst)).topic
+    : null
+
+  const bestStudyDay = progress.daily_stats?.length
+    ? progress.daily_stats.reduce((best, cur) => (cur.cards > best.cards ? cur : best)).date
+    : null
 
   return (
     <div className="space-y-8">
@@ -79,10 +101,10 @@ export default function Analytics() {
             <FireIcon className="w-5 h-5 text-orange-500" />
           </div>
           <p className="text-3xl font-bold text-gray-900">
-            {analytics.streak?.current || 0} days
+            {overview.study_streak || 0} days
           </p>
           <p className="text-sm text-gray-500">
-            Best: {analytics.streak?.longest || 0} days
+            Best: {overview.longest_streak || 0} days
           </p>
         </div>
 
@@ -92,10 +114,10 @@ export default function Analytics() {
             <TrophyIcon className="w-5 h-5 text-yellow-500" />
           </div>
           <p className="text-3xl font-bold text-gray-900">
-            {analytics.cards_mastered || 0}
+            {overview.cards_mastered || 0}
           </p>
           <p className="text-sm text-gray-500">
-            of {analytics.total_cards || 0} total
+            of {overview.total_cards || 0} total
           </p>
         </div>
 
@@ -105,7 +127,7 @@ export default function Analytics() {
             <ClockIcon className="w-5 h-5 text-blue-500" />
           </div>
           <p className="text-3xl font-bold text-gray-900">
-            {Math.round((analytics.total_study_time || 0) / 60)}h
+            {Math.round((overview.total_study_time_minutes || 0) / 60)}h
           </p>
           <p className="text-sm text-gray-500">total study time</p>
         </div>
@@ -116,10 +138,10 @@ export default function Analytics() {
             <AcademicCapIcon className="w-5 h-5 text-green-500" />
           </div>
           <p className="text-3xl font-bold text-gray-900">
-            {analytics.quiz_average || 0}%
+            {overview.average_quiz_score || 0}%
           </p>
           <p className="text-sm text-gray-500">
-            {analytics.quizzes_taken || 0} quizzes taken
+            {overview.quizzes_taken || 0} quizzes taken
           </p>
         </div>
       </div>
@@ -173,14 +195,14 @@ export default function Analytics() {
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Card Difficulty Distribution */}
+        {/* Card Status Distribution */}
         <div className="card p-6">
-          <h3 className="font-semibold text-gray-900 mb-6">Card Difficulty</h3>
+          <h3 className="font-semibold text-gray-900 mb-6">Card Status</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={difficultyDistribution}
+                  data={cardStatusDistribution}
                   cx="50%"
                   cy="50%"
                   innerRadius={40}
@@ -190,7 +212,7 @@ export default function Analytics() {
                     `${name} ${(percent * 100).toFixed(0)}%`
                   }
                 >
-                  {difficultyDistribution.map((_, index) => (
+                  {cardStatusDistribution.map((_, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={COLORS[index % COLORS.length]}
@@ -206,18 +228,18 @@ export default function Analytics() {
         {/* Recent Activity */}
         <div className="card p-6 lg:col-span-2">
           <h3 className="font-semibold text-gray-900 mb-4">Recent Sessions</h3>
-          {analytics.recent_sessions?.length > 0 ? (
+          {overview.recent_sessions?.length > 0 ? (
             <div className="space-y-3">
-              {analytics.recent_sessions
+              {overview.recent_sessions
                 .slice(0, 5)
                 .map(
                   (
                     session: {
-                      id: number
-                      deck_name: string
-                      cards_studied: number
-                      duration: number
                       date: string
+                      duration_minutes: number
+                      cards_studied: number
+                      questions_answered: number
+                      accuracy: number
                     },
                     index: number
                   ) => (
@@ -227,11 +249,11 @@ export default function Analytics() {
                     >
                       <div>
                         <p className="font-medium text-gray-900">
-                          {session.deck_name}
+                          Study session
                         </p>
                         <p className="text-sm text-gray-500">
-                          {session.cards_studied} cards •{' '}
-                          {Math.round(session.duration / 60)} min
+                          {session.cards_studied} cards • {session.questions_answered} questions •{' '}
+                          {Math.round(session.duration_minutes)} min
                         </p>
                       </div>
                       <span className="text-sm text-gray-500">
@@ -256,19 +278,19 @@ export default function Analytics() {
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <p className="text-green-600 font-medium mb-1">Strongest Topic</p>
             <p className="text-lg text-gray-900">
-              {analytics.strongest_topic || 'N/A'}
+              {strongestTopic || 'N/A'}
             </p>
           </div>
           <div className="text-center p-4 bg-orange-50 rounded-lg">
             <p className="text-orange-600 font-medium mb-1">Needs Work</p>
             <p className="text-lg text-gray-900">
-              {analytics.weakest_topic || 'N/A'}
+              {weakestTopic || 'N/A'}
             </p>
           </div>
           <div className="text-center p-4 bg-blue-50 rounded-lg">
             <p className="text-blue-600 font-medium mb-1">Best Study Time</p>
             <p className="text-lg text-gray-900">
-              {analytics.best_study_time || 'N/A'}
+              {bestStudyDay ? new Date(bestStudyDay).toLocaleDateString() : 'N/A'}
             </p>
           </div>
         </div>

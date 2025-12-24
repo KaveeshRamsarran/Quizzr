@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeftIcon,
   CheckIcon,
-  XMarkIcon,
   LightBulbIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
@@ -17,7 +16,6 @@ type Rating = 'again' | 'hard' | 'good' | 'easy'
 
 export default function StudyMode() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const deckId = parseInt(id || '0')
 
   const [currentIndex, setCurrentIndex] = useState(0)

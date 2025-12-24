@@ -9,7 +9,6 @@ from datetime import datetime
 from typing import Optional, List, Any
 import structlog
 
-from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -27,6 +26,7 @@ from app.services.prompts import (
     CALIBRATE_DIFFICULTY_PROMPT
 )
 from app.schemas.generation import DeckGenerationRequest, QuizGenerationRequest
+from app.services.llm import get_llm_client
 
 logger = structlog.get_logger()
 
@@ -36,40 +36,32 @@ class GenerationService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
-        self.model = settings.openai_model
+        self.llm = get_llm_client()
     
-    async def _call_openai(
+    async def _call_llm(
         self,
         prompt: str,
         max_tokens: int = 4000,
         temperature: float = 0.7
     ) -> Optional[dict]:
-        """Call OpenAI API and parse JSON response"""
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert educational content creator. Always respond with valid JSON."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                response_format={"type": "json_object"}
+        """Call the configured LLM provider and parse JSON response."""
+        result = await self.llm.generate_json(
+            prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+        if result is None:
+            provider = getattr(settings, "llm_provider", "ollama")
+            model = getattr(settings, "llm_model", "")
+            ollama_url = getattr(settings, "ollama_base_url", "")
+            hint = (
+                f"LLM call failed (provider={provider}, model={model}). "
+                f"If using Ollama, ensure it is running at {ollama_url} and the model is pulled."
             )
-            
-            content = response.choices[0].message.content
-            return json.loads(content)
-        
-        except json.JSONDecodeError as e:
-            logger.error("Failed to parse OpenAI response as JSON", error=str(e))
-            return None
-        except Exception as e:
-            logger.error("OpenAI API call failed", error=str(e))
-            return None
+            raise RuntimeError(hint)
+
+        return result
     
     async def _extract_facts_from_chunk(
         self,
@@ -83,7 +75,7 @@ class GenerationService:
             content_type=chunk.content_type
         )
         
-        return await self._call_openai(prompt, temperature=0.3)
+        return await self._call_llm(prompt, temperature=0.3)
     
     async def _generate_flashcards_from_facts(
         self,
@@ -117,7 +109,7 @@ class GenerationService:
             card_types=", ".join(card_types)
         )
         
-        return await self._call_openai(prompt, max_tokens=8000, temperature=0.7)
+        return await self._call_llm(prompt, max_tokens=8000, temperature=0.7)
     
     async def _generate_quiz_from_facts(
         self,
@@ -147,7 +139,7 @@ class GenerationService:
             question_types=", ".join(question_types)
         )
         
-        return await self._call_openai(prompt, max_tokens=8000, temperature=0.7)
+        return await self._call_llm(prompt, max_tokens=8000, temperature=0.7)
     
     async def _verify_card(
         self,
@@ -163,7 +155,7 @@ class GenerationService:
             source_quote=card_data.get("source_quote", "")
         )
         
-        result = await self._call_openai(prompt, max_tokens=500, temperature=0.2)
+        result = await self._call_llm(prompt, max_tokens=500, temperature=0.2)
         
         if result:
             return result
@@ -193,7 +185,7 @@ class GenerationService:
             source_quote=question_data.get("source_quote", "")
         )
         
-        result = await self._call_openai(prompt, max_tokens=500, temperature=0.2)
+        result = await self._call_llm(prompt, max_tokens=500, temperature=0.2)
         
         if result:
             return result
@@ -319,36 +311,42 @@ class GenerationService:
             
             await self._log_job(job, "info", f"Generated {len(all_cards)} cards")
             
-            # Step 3: Verify cards
-            job.current_step = "Verifying cards"
-            await self.db.flush()
-            
-            verified_cards = []
-            needs_review_cards = []
-            
-            for card in all_cards:
-                chunk_id = card.get("chunk_id")
-                source_content = chunk_content_map.get(chunk_id, "")
-                
-                verification = await self._verify_card(card, source_content)
-                
-                if verification.get("is_verified", False) and verification.get("confidence", 0) >= 0.7:
+            verified_cards: list[dict] = []
+            needs_review_cards: list[dict] = []
+
+            # Step 3: Verify cards (optional)
+            if request.verify:
+                job.current_step = "Verifying cards"
+                await self.db.flush()
+
+                for card in all_cards:
+                    chunk_id = card.get("chunk_id")
+                    source_content = chunk_content_map.get(chunk_id, "")
+
+                    verification = await self._verify_card(card, source_content)
+
+                    if verification.get("is_verified", False) and verification.get("confidence", 0) >= 0.7:
+                        card["needs_review"] = False
+                        verified_cards.append(card)
+                    else:
+                        card["needs_review"] = True
+                        card["review_reason"] = "; ".join(verification.get("issues", ["Unverified"]))
+                        needs_review_cards.append(card)
+
+                final_cards = verified_cards + needs_review_cards
+
+                job.completed_steps += 1
+                job.progress = (job.completed_steps / job.total_steps) * 100
+
+                await self._log_job(
+                    job, "info",
+                    f"Verified {len(verified_cards)} cards, {len(needs_review_cards)} need review"
+                )
+            else:
+                final_cards = all_cards
+                for card in final_cards:
                     card["needs_review"] = False
-                    verified_cards.append(card)
-                else:
-                    card["needs_review"] = True
-                    card["review_reason"] = "; ".join(verification.get("issues", ["Unverified"]))
-                    needs_review_cards.append(card)
-            
-            final_cards = verified_cards + needs_review_cards
-            
-            job.completed_steps += 1
-            job.progress = (job.completed_steps / job.total_steps) * 100
-            
-            await self._log_job(
-                job, "info",
-                f"Verified {len(verified_cards)} cards, {len(needs_review_cards)} need review"
-            )
+                await self._log_job(job, "info", "Skipping verification (fast mode)")
             
             # Step 4: Create deck and cards
             job.current_step = "Creating deck"
@@ -519,35 +517,42 @@ class GenerationService:
             job.progress = 50
             await self._log_job(job, "info", f"Generated {len(all_questions)} questions")
             
-            # Step 3: Verify questions
-            job.current_step = "Verifying questions"
-            await self.db.flush()
-            
-            verified_questions = []
-            needs_review_questions = []
-            
-            for q in all_questions[:request.question_count]:
-                chunk_id = q.get("chunk_id")
-                source_content = chunk_content_map.get(chunk_id, "")
-                
-                verification = await self._verify_question(q, source_content)
-                
-                if verification.get("is_verified", False) and verification.get("confidence", 0) >= 0.7:
+            verified_questions: list[dict] = []
+            needs_review_questions: list[dict] = []
+
+            # Step 3: Verify questions (optional)
+            if request.verify:
+                job.current_step = "Verifying questions"
+                await self.db.flush()
+
+                for q in all_questions[:request.question_count]:
+                    chunk_id = q.get("chunk_id")
+                    source_content = chunk_content_map.get(chunk_id, "")
+
+                    verification = await self._verify_question(q, source_content)
+
+                    if verification.get("is_verified", False) and verification.get("confidence", 0) >= 0.7:
+                        q["needs_review"] = False
+                        verified_questions.append(q)
+                    else:
+                        q["needs_review"] = True
+                        q["review_reason"] = "; ".join(verification.get("issues", ["Unverified"]))
+                        needs_review_questions.append(q)
+
+                final_questions = verified_questions + needs_review_questions
+                job.completed_steps = 3
+                job.progress = 75
+                await self._log_job(
+                    job, "info",
+                    f"Verified {len(verified_questions)} questions, {len(needs_review_questions)} need review"
+                )
+            else:
+                final_questions = all_questions[:request.question_count]
+                for q in final_questions:
                     q["needs_review"] = False
-                    verified_questions.append(q)
-                else:
-                    q["needs_review"] = True
-                    q["review_reason"] = "; ".join(verification.get("issues", ["Unverified"]))
-                    needs_review_questions.append(q)
-            
-            final_questions = verified_questions + needs_review_questions
-            
-            job.completed_steps = 3
-            job.progress = 75
-            await self._log_job(
-                job, "info",
-                f"Verified {len(verified_questions)} questions, {len(needs_review_questions)} need review"
-            )
+                job.completed_steps = 3
+                job.progress = 75
+                await self._log_job(job, "info", "Skipping verification (fast mode)")
             
             # Step 4: Create quiz
             job.current_step = "Creating quiz"

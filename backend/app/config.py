@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = ""
     openai_model: str = "gpt-4-turbo-preview"
+    # Optional: use an OpenAI-compatible local server by setting a base URL.
+    # Example: http://localhost:8321/v1 (if your local server exposes /v1)
+    openai_base_url: str = ""
+
+    # Local/Pluggable LLM (recommended: Ollama)
+    # llm_provider: 'ollama' (default) or 'openai' (OpenAI or OpenAI-compatible)
+    llm_provider: str = "ollama"
+    # Example Ollama models: 'llama3.1', 'llama3.1:8b', custom model name, etc.
+    llm_model: str = "llama3.1"
+    ollama_base_url: str = "http://localhost:11434"
     
     # File Upload
     max_upload_size_mb: int = 50

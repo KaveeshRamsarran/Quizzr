@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -10,18 +10,17 @@ import {
   ArrowRightIcon,
 } from '@heroicons/react/24/outline'
 import { quizzesApi } from '../lib/api'
-import type { QuizQuestion, AttemptResult } from '../types'
+import type { AttemptResult } from '../types'
 import clsx from 'clsx'
 
 export default function QuizTake() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const quizId = parseInt(id || '0')
 
   const [attemptId, setAttemptId] = useState<number | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
-  const [answers, setAnswers] = useState<Record<number, { answer: string; correct: boolean }>>({})
+  const [, setAnswers] = useState<Record<number, { answer: string; correct: boolean }>>({})
   const [result, setResult] = useState<AttemptResult | null>(null)
   const [startTime, setStartTime] = useState<number>(Date.now())
   const [elapsedTime, setElapsedTime] = useState(0)

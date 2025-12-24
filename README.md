@@ -61,7 +61,8 @@ An AI-powered flashcard and quiz generation application that transforms PDF docu
 ### Prerequisites
 
 - Docker & Docker Compose
-- OpenAI API Key
+- (Option A) Ollama (local Llama-family models)
+- (Option B) OpenAI API Key
 
 ### 1. Clone & Setup
 
@@ -76,7 +77,20 @@ cp .env.example .env
 
 ### 2. Configure Environment
 
-Edit `.env` and set your OpenAI API key:
+Edit `.env` and choose one LLM option.
+
+**Option A: Local (recommended)**
+
+- Install Ollama and start it (`ollama serve`)
+- Pull a model, e.g. `ollama pull llama3.1`
+
+```env
+LLM_PROVIDER=ollama
+LLM_MODEL=llama3.1
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+**Option B: OpenAI**
 
 ```env
 OPENAI_API_KEY=sk-your-api-key-here
@@ -96,8 +110,8 @@ docker-compose up -d --build
 ### 4. Access the Application
 
 - **Frontend**: http://localhost:3000
-- **API Documentation**: http://localhost:8000/docs
-- **API (Redoc)**: http://localhost:8000/redoc
+- **API Documentation**: http://localhost:8002/docs
+- **API (Redoc)**: http://localhost:8002/redoc
 
 ## 📁 Project Structure
 

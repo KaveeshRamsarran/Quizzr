@@ -1,0 +1,43 @@
+version: 2
+image_name: quizzr-local
+apis:
+  - inference
+providers:
+  inference:
+    - provider_id: ollama
+      provider_type: remote::ollama
+      config:
+        url: http://localhost:11434
+server:
+  port: 8322
+  workers: 1
+telemetry:
+  enabled: false
+storage:
+  backends:
+    kv_default:
+      type: kv_sqlite
+      db_path: ${env.SQLITE_STORE_DIR:=~/.llama/distributions/quizzr-local}/kvstore.db
+    sql_default:
+      type: sql_sqlite
+      db_path: ${env.SQLITE_STORE_DIR:=~/.llama/distributions/quizzr-local}/sql_store.db
+  stores:
+    metadata:
+      namespace: registry
+      backend: kv_default
+    inference:
+      table_name: inference_store
+      backend: sql_default
+      max_write_queue_size: 10000
+      num_writers: 2
+    conversations:
+      table_name: openai_conversations
+      backend: sql_default
+registered_resources:
+  benchmarks: []
+  datasets: []
+  models: []
+  scoring_fns: []
+  shields: []
+  tool_groups: []
+  vector_stores: []

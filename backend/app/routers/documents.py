@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -242,6 +243,68 @@ async def get_document(
     base["chunks"] = [ChunkResponse.model_validate(c).model_dump() for c in chunks_result.scalars().all()]
 
     return DocumentDetail(**base)
+
+
+@router.get("/{document_id}/file")
+async def get_document_file(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Stream the original PDF file for this document (authenticated)."""
+    result = await session.execute(
+        select(Document).where(
+            Document.id == document_id,
+            Document.user_id == current_user.id,
+        )
+    )
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    stored_path = document.file_path
+    if not stored_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    # Resolve to an absolute on-disk path.
+    # If the stored path is relative, treat it as relative to upload_dir.
+    base_dir = os.path.abspath(settings.upload_dir)
+    candidate_path = stored_path
+    if not os.path.isabs(candidate_path):
+        candidate_path = os.path.join(base_dir, candidate_path)
+    abs_path = os.path.abspath(candidate_path)
+
+    if not os.path.exists(abs_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    # Path safety: ensure file is under upload_dir (normalized, Windows-safe).
+    try:
+        if os.path.commonpath([abs_path, base_dir]) != base_dir:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file path",
+            )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path",
+        )
+
+    return FileResponse(
+        path=abs_path,
+        media_type="application/pdf",
+        filename=document.original_filename,
+        headers={"Content-Disposition": f'inline; filename="{document.original_filename}"'},
+    )
 
 
 @router.put("/{document_id}", response_model=DocumentResponse)

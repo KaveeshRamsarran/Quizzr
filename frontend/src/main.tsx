@@ -6,6 +6,17 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './index.css'
 
+const savedTheme = localStorage.getItem('quizzr-theme') || 'light'
+const root = document.documentElement
+root.classList.remove('dark')
+if (savedTheme === 'dark') {
+  root.classList.add('dark')
+} else if (savedTheme === 'system') {
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    root.classList.add('dark')
+  }
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

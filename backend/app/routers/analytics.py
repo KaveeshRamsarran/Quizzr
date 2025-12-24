@@ -34,7 +34,7 @@ async def get_overview(
     return AnalyticsOverview(**overview)
 
 
-@router.get("/topics", response_model=list[TopicAnalytics])
+@router.get("/topics", response_model=TopicAnalytics)
 async def get_topic_analytics(
     course_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
@@ -46,7 +46,7 @@ async def get_topic_analytics(
     """
     analytics_service = AnalyticsService(session)
     topics = await analytics_service.get_topic_analytics(current_user.id, course_id)
-    return [TopicAnalytics(**t) for t in topics]
+    return TopicAnalytics(**topics)
 
 
 @router.get("/progress", response_model=StudyProgressResponse)

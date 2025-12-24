@@ -1,10 +1,10 @@
 # FastAPI and ASGI
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+python-multipart==0.0.21
 
 # Database (SQLite for local dev)
-sqlalchemy==2.0.25
+sqlalchemy==2.0.45
 aiosqlite==0.19.0
 
 # Authentication
@@ -15,15 +15,15 @@ bcrypt==4.1.2
 # PDF Processing
 PyPDF2==3.0.1
 pdfplumber==0.10.3
-Pillow==10.2.0
+Pillow==12.0.0
 
 # AI/OpenAI
-openai==1.12.0
-tiktoken==0.5.2
+openai==2.14.0
+tiktoken==0.12.0
 
 # Validation and Config
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
 python-dotenv==1.0.0
 email-validator==2.1.0
 
@@ -34,3 +34,6 @@ aiofiles==23.2.1
 
 # Rate Limiting
 slowapi==0.1.9
+
+# Logging
+structlog==24.1.0

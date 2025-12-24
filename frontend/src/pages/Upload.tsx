@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -40,7 +40,7 @@ export default function Upload() {
   // Generation mutation
   const generateDeckMutation = useMutation({
     mutationFn: (documentId: number) =>
-      generationApi.generateDeck({ document_id: documentId }),
+      generationApi.generateDeck({ document_id: documentId, card_count: 10 }),
     onSuccess: (job) => {
       setGenerationJob(job)
       setGenerationType('deck')
@@ -54,7 +54,7 @@ export default function Upload() {
 
   const generateQuizMutation = useMutation({
     mutationFn: (documentId: number) =>
-      generationApi.generateQuiz({ document_id: documentId }),
+      generationApi.generateQuiz({ document_id: documentId, question_count: 10 }),
     onSuccess: (job) => {
       setGenerationJob(job)
       setGenerationType('quiz')
@@ -70,31 +70,35 @@ export default function Upload() {
   const { data: jobStatus } = useQuery({
     queryKey: ['generation-job', generationJob?.job_id],
     queryFn: () => generationApi.getJobStatus(generationJob!.job_id),
-    enabled: !!generationJob && generationJob.status !== 'completed' && generationJob.status !== 'failed',
-    refetchInterval: 2000,
+    enabled: !!generationJob,
+    refetchInterval: (query) => {
+      const status = (query.state.data as GenerationJob | undefined)?.status ?? generationJob?.status
+      return status && ['completed', 'failed'].includes(status) ? false : 2000
+    },
   })
 
   // Poll for document processing status
   const { data: docStatus } = useQuery({
     queryKey: ['document', uploadedDoc?.id],
     queryFn: () => documentsApi.get(uploadedDoc!.id),
-    enabled: !!uploadedDoc && uploadedDoc.status !== 'processed' && uploadedDoc.status !== 'error',
-    refetchInterval: 2000,
+    enabled: !!uploadedDoc,
+    refetchInterval: (query) => {
+      const status = (query.state.data as Document | undefined)?.status ?? uploadedDoc?.status
+      return status && ['processed', 'error'].includes(status) ? false : 2000
+    },
   })
 
   const currentDoc = docStatus || uploadedDoc
   const currentJob = jobStatus || generationJob
 
-  // Handle job completion
-  if (currentJob?.status === 'completed' && currentJob.result_id) {
-    const resultPath = generationType === 'deck' 
+  useEffect(() => {
+    if (currentJob?.status !== 'completed' || !currentJob.result_id) return
+    const resultPath = generationType === 'deck'
       ? `/decks/${currentJob.result_id}`
       : `/quizzes/${currentJob.result_id}`
-    
-    setTimeout(() => {
-      navigate(resultPath)
-    }, 1000)
-  }
+    const t = window.setTimeout(() => navigate(resultPath), 800)
+    return () => window.clearTimeout(t)
+  }, [currentJob?.status, currentJob?.result_id, generationType, navigate])
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -264,11 +268,19 @@ export default function Upload() {
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
                   className="bg-primary-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${currentJob.progress || 10}%` }}
+                  style={{ width: `${currentJob.progress ?? 10}%` }}
                 />
               </div>
-              <p className="mt-2 text-sm text-gray-500">
-                This may take a minute. We're extracting key concepts and generating content.
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className="text-sm text-gray-500">
+                  Status: <span className="font-medium">{currentJob.status}</span>
+                  {typeof currentJob.progress === 'number' ? ` • ${currentJob.progress}%` : ''}
+                  {currentJob.job_id ? ` • Job #${currentJob.job_id}` : ''}
+                </p>
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                {currentJob.message ||
+                  "This can take a couple minutes depending on document size and generation."}
               </p>
             </div>
           )}

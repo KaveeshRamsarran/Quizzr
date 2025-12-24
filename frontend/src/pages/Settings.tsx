@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../lib/api'
 import clsx from 'clsx'
+import toast from 'react-hot-toast'
 
 type Tab = 'profile' | 'security' | 'preferences' | 'notifications'
 
@@ -30,7 +31,9 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState('')
 
   // Preferences
-  const [theme, setTheme] = useState('light')
+  const [theme, setTheme] = useState<string>(() => {
+    return localStorage.getItem('quizzr-theme') || 'light'
+  })
   const [cardsPerSession, setCardsPerSession] = useState(20)
   const [showAnswerImmediately, setShowAnswerImmediately] = useState(false)
   const [autoPlayAudio, setAutoPlayAudio] = useState(true)
@@ -41,28 +44,21 @@ export default function Settings() {
   const [weeklyReport, setWeeklyReport] = useState(true)
 
   const profileMutation = useMutation({
-    mutationFn: (data: { name: string; email: string }) =>
-      authApi.updateProfile(data),
+    mutationFn: (data: { name: string; email: string }) => authApi.updateMe(data),
     onSuccess: (updatedUser) => {
       updateUser(updatedUser)
+      toast.success('Profile updated')
     },
   })
 
   const passwordMutation = useMutation({
-    mutationFn: (data: { current_password: string; new_password: string }) =>
-      authApi.changePassword(data),
+    mutationFn: (data: { currentPassword: string; newPassword: string }) =>
+      authApi.changePassword(data.currentPassword, data.newPassword),
     onSuccess: () => {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      alert('Password changed successfully!')
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: () => authApi.deleteAccount(),
-    onSuccess: () => {
-      logout()
+      toast.success('Password changed successfully')
     },
   })
 
@@ -81,13 +77,26 @@ export default function Settings() {
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (newPassword !== confirmPassword) {
-      alert('Passwords do not match!')
+      toast.error('Passwords do not match')
       return
     }
-    passwordMutation.mutate({
-      current_password: currentPassword,
-      new_password: newPassword,
-    })
+    passwordMutation.mutate({ currentPassword, newPassword })
+  }
+
+  const applyTheme = (nextTheme: string) => {
+    setTheme(nextTheme)
+    localStorage.setItem('quizzr-theme', nextTheme)
+
+    const root = document.documentElement
+    root.classList.remove('dark')
+
+    if (nextTheme === 'dark') {
+      root.classList.add('dark')
+    } else if (nextTheme === 'system') {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark')
+      }
+    }
   }
 
   return (
@@ -265,7 +274,7 @@ export default function Settings() {
                   </label>
                   <select
                     value={theme}
-                    onChange={(e) => setTheme(e.target.value)}
+                    onChange={(e) => applyTheme(e.target.value)}
                     className="input"
                   >
                     <option value="light">Light</option>
@@ -449,11 +458,13 @@ export default function Settings() {
                 Cancel
               </button>
               <button
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isPending}
+                onClick={() => {
+                  toast.error('Delete account is not available yet')
+                  setShowDeleteModal(false)
+                }}
                 className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete Account'}
+                Delete Account
               </button>
             </div>
           </motion.div>

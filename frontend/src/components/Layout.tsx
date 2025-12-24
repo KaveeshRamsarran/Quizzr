@@ -4,6 +4,7 @@ import { Menu, Transition } from '@headlessui/react'
 import {
   HomeIcon,
   DocumentArrowUpIcon,
+  DocumentTextIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
@@ -16,6 +17,7 @@ import clsx from 'clsx'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Upload', href: '/upload', icon: DocumentArrowUpIcon },
+  { name: 'Documents', href: '/documents', icon: DocumentTextIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ]

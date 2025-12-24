@@ -198,37 +198,64 @@ export interface QuizGenerationRequest {
 
 // Analytics types
 export interface AnalyticsOverview {
+  study_streak: number
+  longest_streak: number
+  total_study_time_minutes: number
+  avg_daily_study_minutes: number
+
   total_documents: number
   total_decks: number
+  total_cards: number
   total_quizzes: number
-  total_cards_studied: number
-  total_quizzes_taken: number
+
   cards_mastered: number
-  average_quiz_score: number
-  study_streak: number
+  cards_learning: number
+  cards_new: number
+  mastery_rate: number
+
+  overall_accuracy: number
+  cards_studied_today: number
   cards_due_today: number
+  quizzes_taken: number
+  average_quiz_score: number
+
+  last_study_date: string | null
+  recent_sessions: StudySession[]
 }
 
 export interface TopicAnalytics {
-  topic: string
-  card_count: number
-  mastery_percentage: number
-  quiz_accuracy: number
-  study_time_minutes: number
+  topics: TopicPerformance[]
+  weak_topics: string[]
+  strong_topics: string[]
+  recommended_review: string[]
 }
 
-export interface StudyProgress {
+export interface StudySession {
   date: string
+  duration_minutes: number
   cards_studied: number
-  quizzes_taken: number
+  questions_answered: number
   accuracy: number
 }
 
 export interface StudyProgressResponse {
-  daily_progress: StudyProgress[]
-  total_cards_studied: number
-  total_quizzes_taken: number
-  average_accuracy: number
+  period: 'week' | 'month' | 'all_time' | string
+  daily_stats: Array<{ date: string; cards: number; accuracy: number }>
+  accuracy_trend: number[]
+  volume_trend: number[]
+  this_week_vs_last: { cards: number; accuracy: number; time: number }
+  daily_goal: number
+  goal_completion_rate: number
+}
+
+export interface TopicPerformance {
+  topic: string
+  total_items: number
+  correct: number
+  incorrect: number
+  accuracy: number
+  last_studied: string | null
+  trend: string
 }
 
 // Spaced repetition types

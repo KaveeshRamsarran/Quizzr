@@ -31,11 +31,14 @@ class DeckGenerationRequest(BaseModel):
     topics: Optional[List[str]] = None  # Filter by topics
     
     # Generation settings
-    max_cards: int = Field(default=50, ge=5, le=200)
+    max_cards: int = Field(default=20, ge=5, le=200)
     difficulty: str = Field(default="mixed")  # easy, medium, hard, mixed
     include_eli5: bool = False  # Include ELI5 explanations
     include_examples: bool = True
     include_mnemonics: bool = False
+
+    # Speed/quality tradeoff
+    verify: bool = Field(default=False)
     
     # Card type toggles
     include_basic: bool = True
@@ -88,7 +91,7 @@ class QuizGenerationRequest(BaseModel):
     topics: Optional[List[str]] = None
     
     # Generation settings
-    question_count: int = Field(default=20, ge=5, le=50)
+    question_count: int = Field(default=10, ge=5, le=50)
     difficulty: str = Field(default="mixed")  # easy, medium, hard, mixed
     
     # Question type toggles
@@ -103,6 +106,9 @@ class QuizGenerationRequest(BaseModel):
     include_explanations: bool = True
     shuffle_questions: bool = True
     shuffle_options: bool = True
+
+    # Speed/quality tradeoff
+    verify: bool = Field(default=False)
 
     @model_validator(mode="after")
     def _apply_frontend_compat(self) -> "QuizGenerationRequest":

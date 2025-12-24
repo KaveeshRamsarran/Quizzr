@@ -36,6 +36,7 @@ class UserLogin(BaseModel):
 
 class UserUpdate(BaseModel):
     """Schema for updating user profile"""
+    email: Optional[EmailStr] = None
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     school: Optional[str] = Field(None, max_length=255)
     timezone: Optional[str] = Field(None, max_length=50)
