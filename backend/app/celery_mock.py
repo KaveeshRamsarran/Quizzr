@@ -5,6 +5,7 @@ Provides mock implementations when Celery is not available
 
 import asyncio
 import inspect
+import concurrent.futures
 from functools import wraps
 
 
@@ -53,12 +54,24 @@ class MockTask:
                 # If signature inspection fails, just proceed
                 pass
 
-            # For async functions, we need to run them
-            if asyncio.iscoroutinefunction(self.func):
-                loop = asyncio.get_event_loop()
-                result.result = loop.run_until_complete(self.func(*call_args, **kwargs))
-            else:
-                result.result = self.func(*call_args, **kwargs)
+            def _invoke():
+                if asyncio.iscoroutinefunction(self.func):
+                    return asyncio.run(self.func(*call_args, **kwargs))
+                return self.func(*call_args, **kwargs)
+
+            # Important: Even if the task function itself is sync, it may call
+            # asyncio.run() internally (our generation tasks do). When called
+            # from inside FastAPI's running event loop, run the whole task in a
+            # separate thread to avoid nested event loop errors.
+            try:
+                asyncio.get_running_loop()
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(_invoke)
+                    result.result = future.result()
+            except RuntimeError:
+                # No running loop in this thread.
+                result.result = _invoke()
+
             result.state = "SUCCESS"
         except Exception as e:
             result.state = "FAILURE"

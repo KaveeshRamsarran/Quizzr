@@ -83,7 +83,7 @@ class LLMConfig:
     provider: str
     model: str
     base_url: str
-    timeout_seconds: float = 120.0
+    timeout_seconds: float = 300.0  # 5 minutes for larger generation tasks
 
 
 class LLMClient:

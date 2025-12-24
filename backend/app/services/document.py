@@ -54,7 +54,7 @@ class DocumentService:
         return hashlib.sha256(content).hexdigest()
     
     async def save_file(self, content: bytes, filename: str) -> str:
-        """Save file to upload directory"""
+        """Save file to upload directory and return relative path"""
         upload_dir = Path(settings.upload_dir)
         upload_dir.mkdir(parents=True, exist_ok=True)
         
@@ -62,7 +62,9 @@ class DocumentService:
         async with aiofiles.open(file_path, "wb") as f:
             await f.write(content)
         
-        return str(file_path)
+        # Return path relative to upload_dir (e.g., "filename.pdf" or "uploads/filename.pdf")
+        # to match what the retrieval endpoint expects
+        return os.path.join("uploads", filename)
     
     async def delete_file(self, file_path: str) -> bool:
         """Delete a file from storage"""

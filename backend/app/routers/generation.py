@@ -68,13 +68,26 @@ async def generate_deck(
     await session.commit()
     await session.refresh(job)
     
-    # Queue generation task
-    generate_deck_task.delay(job.id, request.model_dump())
+    # Queue generation task (executes synchronously in local dev with celery_mock)
+    try:
+        result = generate_deck_task.delay(job.id, request.model_dump())
+        # In local dev, task executes immediately; check for errors
+        if hasattr(result, 'state') and result.state == 'FAILURE':
+            job.status = JobStatus.FAILED
+            job.error_message = str(getattr(result, 'result', 'Task failed'))
+            await session.commit()
+    except Exception as e:
+        job.status = JobStatus.FAILED
+        job.error_message = f"Failed to start generation: {str(e)}"
+        await session.commit()
+    
+    # Refresh to get updated status
+    await session.refresh(job)
     
     return GenerationJobResponse(
         job_id=job.id,
-        status=GenerationJobStatus.PENDING,
-        message="Deck generation started",
+        status=GenerationJobStatus(job.status.value),
+        message="Deck generation started" if job.status == JobStatus.PENDING else f"Generation {job.status.value}",
         progress=job.progress,
         result_id=None,
         created_at=job.created_at,
@@ -124,13 +137,26 @@ async def generate_quiz(
     await session.commit()
     await session.refresh(job)
     
-    # Queue generation task
-    generate_quiz_task.delay(job.id, request.model_dump())
+    # Queue generation task (executes synchronously in local dev with celery_mock)
+    try:
+        result = generate_quiz_task.delay(job.id, request.model_dump())
+        # In local dev, task executes immediately; check for errors
+        if hasattr(result, 'state') and result.state == 'FAILURE':
+            job.status = JobStatus.FAILED
+            job.error_message = str(getattr(result, 'result', 'Task failed'))
+            await session.commit()
+    except Exception as e:
+        job.status = JobStatus.FAILED
+        job.error_message = f"Failed to start generation: {str(e)}"
+        await session.commit()
+    
+    # Refresh to get updated status
+    await session.refresh(job)
     
     return GenerationJobResponse(
         job_id=job.id,
-        status=GenerationJobStatus.PENDING,
-        message="Quiz generation started",
+        status=GenerationJobStatus(job.status.value),
+        message="Quiz generation started" if job.status == JobStatus.PENDING else f"Generation {job.status.value}",
         progress=job.progress,
         result_id=None,
         created_at=job.created_at,

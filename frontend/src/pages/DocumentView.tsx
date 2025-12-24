@@ -21,8 +21,6 @@ export default function DocumentView() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const documentId = parseInt(id || '0')
 
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [showPdf, setShowPdf] = useState(false)
   const [generationType, setGenerationType] = useState<'deck' | 'quiz' | null>(null)
   const [generationJob, setGenerationJob] = useState<GenerationJob | null>(null)
 
@@ -102,42 +100,30 @@ export default function DocumentView() {
       toast.error('Not authenticated')
       return
     }
+    
     try {
+      // Fetch the PDF with authentication
       const res = await fetch(`/api/documents/${documentId}/file`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       })
+      
       if (!res.ok) {
-        let detail = ''
-        try {
-          const contentType = res.headers.get('content-type') || ''
-          if (contentType.includes('application/json')) {
-            const data = (await res.json()) as { detail?: string }
-            detail = data?.detail ? `: ${data.detail}` : ''
-          } else {
-            const text = await res.text()
-            detail = text ? `: ${text}` : ''
-          }
-        } catch {
-          // ignore parsing errors
-        }
-        throw new Error(`Failed to load PDF (${res.status})${detail}`)
+        throw new Error(`Failed to load PDF (${res.status})`)
       }
+      
+      // Create a blob URL and open it in a new tab
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
-      setPdfUrl(url)
-      setShowPdf(true)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      
+      // Clean up the blob URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 60000) // 1 minute
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to load PDF')
     }
   }
-
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
-    }
-  }, [pdfUrl])
 
   if (isLoading) {
     return (
@@ -254,45 +240,13 @@ export default function DocumentView() {
 
         <div className="mt-6 pt-4 border-t flex items-center gap-3">
           <button
-            onClick={() => {
-              if (pdfUrl) {
-                setShowPdf((v) => !v)
-              } else {
-                void loadPdf()
-              }
-            }}
-            className="btn-secondary"
+            onClick={() => loadPdf()}
+            className="btn-primary"
           >
-            View PDF
+            View PDF in New Tab
           </button>
-          {pdfUrl && (
-            <button
-              onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
-              className="btn-secondary"
-            >
-              Open in New Tab
-            </button>
-          )}
         </div>
       </div>
-
-      {showPdf && pdfUrl && (
-        <div className="card overflow-hidden mb-6">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">PDF Preview</h2>
-            <button onClick={() => setShowPdf(false)} className="btn-secondary">
-              Hide
-            </button>
-          </div>
-          <div className="w-full" style={{ height: 800 }}>
-            <iframe
-              title="PDF Preview"
-              src={pdfUrl}
-              className="w-full h-full"
-            />
-          </div>
-        </div>
-      )}
 
       {/* Actions */}
       {canGenerate && !generationJob && (

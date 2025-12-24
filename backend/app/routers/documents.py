@@ -274,11 +274,21 @@ async def get_document_file(
 
     # Resolve to an absolute on-disk path.
     # If the stored path is relative, treat it as relative to upload_dir.
+    # Be tolerant of legacy DB values that already include an 'uploads/' prefix.
     base_dir = os.path.abspath(settings.upload_dir)
-    candidate_path = stored_path
-    if not os.path.isabs(candidate_path):
-        candidate_path = os.path.join(base_dir, candidate_path)
-    abs_path = os.path.abspath(candidate_path)
+    upload_dir_name = os.path.basename(base_dir.rstrip("\\/"))
+    backend_root = os.path.abspath(os.path.join(base_dir, os.pardir))
+
+    candidate_path = stored_path.strip()
+    if os.path.isabs(candidate_path):
+        abs_path = os.path.abspath(candidate_path)
+    else:
+        normalized = candidate_path.replace("/", os.sep).replace("\\", os.sep)
+        if normalized == upload_dir_name or normalized.startswith(upload_dir_name + os.sep):
+            # stored_path already includes 'uploads/...'
+            abs_path = os.path.abspath(os.path.join(backend_root, normalized))
+        else:
+            abs_path = os.path.abspath(os.path.join(base_dir, normalized))
 
     if not os.path.exists(abs_path):
         raise HTTPException(
