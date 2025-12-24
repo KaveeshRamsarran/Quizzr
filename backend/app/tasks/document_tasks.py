@@ -14,6 +14,7 @@ except ImportError:
     from app.celery_mock import shared_task
 
 from sqlalchemy import create_engine, select
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import sessionmaker, Session
 
 from app.config import settings
@@ -23,9 +24,41 @@ from app.models.job import ProcessingJob, JobStatus, JobType, JobLog
 logger = structlog.get_logger()
 
 
+def _log_job(
+    session: Session,
+    job_id: int,
+    level: str,
+    message: str,
+    details: Optional[dict] = None,
+) -> None:
+    """Best-effort job log writer.
+
+    Task processing should not fail just because logging failed.
+    """
+    try:
+        log = JobLog(job_id=job_id, level=level, message=message, details=details)
+        session.add(log)
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.warning(
+            "Failed to write JobLog",
+            job_id=job_id,
+            level=level,
+            message=message,
+        )
+
+
 def get_sync_session() -> Session:
     """Get a synchronous database session for Celery tasks"""
-    engine = create_engine(settings.database_url)
+    # Celery/local tasks are synchronous. If the app uses an async DB URL
+    # (e.g. sqlite+aiosqlite), convert it to a sync driver for create_engine.
+    url = make_url(settings.database_url)
+    if url.drivername.endswith("+aiosqlite"):
+        url = url.set(drivername="sqlite")
+    if url.drivername.endswith("+asyncpg"):
+        url = url.set(drivername="postgresql")
+    engine = create_engine(url.render_as_string(hide_password=False))
     SessionLocal = sessionmaker(bind=engine)
     return SessionLocal()
 
@@ -91,7 +124,8 @@ def process_document_task(self, job_id: int) -> dict:
         for page_data in pages_data:
             text_length = len(page_data.get("text", ""))
             
-            if text_length < ocr_threshold and job.parameters.get("ocr_enabled", True):
+            ocr_enabled = job.parameters.get("ocr_enabled", True) if job.parameters else True
+            if text_length < ocr_threshold and ocr_enabled:
                 # Run OCR on this page
                 job.current_step = f"Running OCR on page {page_data['page_number']}"
                 session.commit()
@@ -111,6 +145,12 @@ def process_document_task(self, job_id: int) -> dict:
             document.ocr_used = True
             document.ocr_pages = ocr_pages
             _log_job(session, job.id, "info", f"OCR used on {len(ocr_pages)} pages")
+
+        # If we still have no extractable text, stop with an actionable error.
+        if not any((p.get("text") or "").strip() for p in pages_data):
+            raise ValueError(
+                "No text could be extracted from this PDF. If it is scanned, OCR is required."
+            )
         
         # Step 3: Save pages to database
         job.current_step = "Saving pages"
@@ -163,7 +203,9 @@ def process_document_task(self, job_id: int) -> dict:
             session.add(chunk)
         
         # Finalize
-        document.status = ProcessingStatus.COMPLETED
+        # Generation endpoints require DocumentStatus.PROCESSED. Treat this as the canonical
+        # "ready" state after extraction + chunking succeed.
+        document.status = ProcessingStatus.PROCESSED
         document.processed_at = datetime.utcnow()
         
         job.status = JobStatus.COMPLETED
@@ -213,58 +255,76 @@ def process_document_task(self, job_id: int) -> dict:
 
 def extract_pdf_text(file_path: str) -> List[dict]:
     """Extract text from PDF file page by page"""
-    import pdfplumber
-    
-    pages_data = []
-    
+    pages_data: List[dict] = []
+
+    def _headings_from_text(text: str) -> List[str]:
+        headings: List[str] = []
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if len(line) >= 100:
+                continue
+            if line.endswith("."):
+                continue
+            if not line[0].isupper():
+                continue
+            headings.append(line)
+        return headings[:5]
+
+    # Prefer pypdf (if installed), otherwise fall back to PyPDF2.
     try:
+        try:
+            from pypdf import PdfReader  # type: ignore
+        except Exception:
+            from PyPDF2 import PdfReader  # type: ignore
+
+        reader = PdfReader(file_path)
+        for page_num, page in enumerate(reader.pages, start=1):
+            text = page.extract_text() or ""
+            pages_data.append(
+                {
+                    "page_number": page_num,
+                    "text": text,
+                    "headings": _headings_from_text(text),
+                    "has_tables": False,
+                    "has_images": False,
+                    "used_ocr": False,
+                }
+            )
+
+        # Some PDFs yield empty text via PdfReader but work via pdfplumber.
+        if any((p.get("text") or "").strip() for p in pages_data):
+            return pages_data
+        pages_data = []
+    except Exception as e:
+        logger.warning("PdfReader extraction failed; trying pdfplumber", error=str(e))
+
+    # Optional fallback to pdfplumber if available.
+    try:
+        import pdfplumber  # type: ignore
+
         with pdfplumber.open(file_path) as pdf:
             for page_num, page in enumerate(pdf.pages, start=1):
                 text = page.extract_text() or ""
-                
-                # Detect headings (simple heuristic: lines that are short and don't end with period)
-                headings = []
-                for line in text.split("\n"):
-                    line = line.strip()
-                    if line and len(line) < 100 and not line.endswith(".") and line[0].isupper():
-                        headings.append(line)
-                
-                # Check for tables
-                tables = page.extract_tables()
-                has_tables = len(tables) > 0
-                
-                # Check for images (approximate via page content)
-                has_images = len(page.images) > 0 if hasattr(page, 'images') else False
-                
-                pages_data.append({
-                    "page_number": page_num,
-                    "text": text,
-                    "headings": headings[:5],  # Limit to 5 headings per page
-                    "has_tables": has_tables,
-                    "has_images": has_images,
-                    "used_ocr": False
-                })
-    
+
+                tables = page.extract_tables() if hasattr(page, "extract_tables") else []
+                has_tables = bool(tables)
+                has_images = bool(getattr(page, "images", []))
+
+                pages_data.append(
+                    {
+                        "page_number": page_num,
+                        "text": text,
+                        "headings": _headings_from_text(text),
+                        "has_tables": has_tables,
+                        "has_images": has_images,
+                        "used_ocr": False,
+                    }
+                )
     except Exception as e:
         logger.error("PDF extraction failed", error=str(e))
-        # Fallback to PyPDF2
-        try:
-            from PyPDF2 import PdfReader
-            reader = PdfReader(file_path)
-            
-            for page_num, page in enumerate(reader.pages, start=1):
-                text = page.extract_text() or ""
-                pages_data.append({
-                    "page_number": page_num,
-                    "text": text,
-                    "headings": [],
-                    "has_tables": False,
-                    "has_images": False,
-                    "used_ocr": False
-                })
-        except Exception as e2:
-            logger.error("PyPDF2 fallback failed", error=str(e2))
-    
+
     return pages_data
 
 
@@ -418,55 +478,79 @@ def create_chunks(pages_data: List[dict], style: DocumentStyle) -> List[dict]:
 
 def extract_key_terms(text: str) -> List[str]:
     """Extract key terms from text using simple heuristics"""
-    # Find capitalized terms (potential proper nouns/technical terms)
-    words = text.split()
-    terms = set()
-    
-    for word in words:
-        # Clean word
-        clean = re.sub(r'[^\w\s]', '', word)
-        
-        # Check if it's a potential term
-        if clean and len(clean) > 3 and clean[0].isupper():
-            terms.add(clean)
-    
-    # Look for terms in quotes
-    quoted = re.findall(r'"([^"]+)"', text)
-    terms.update(quoted)
-    
-    # Look for bold-style indicators (often key terms)
-    bold_style = re.findall(r'\*\*([^*]+)\*\*', text)
-    terms.update(bold_style)
-    
-    return list(terms)[:20]  # Limit to 20 terms
+    if not text:
+        return []
+
+    stopwords = {
+        "the",
+        "and",
+        "for",
+        "with",
+        "that",
+        "this",
+        "from",
+        "into",
+        "your",
+        "you",
+        "are",
+        "was",
+        "were",
+        "will",
+        "can",
+        "could",
+        "should",
+        "would",
+        "have",
+        "has",
+        "had",
+        "not",
+        "but",
+        "about",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "whom",
+        "their",
+        "there",
+        "then",
+        "than",
+        "also",
+        "etc",
+    }
+
+    # Basic tokenization and counting.
+    words = re.findall(r"[A-Za-z][A-Za-z\-']{2,}", text)
+    counts: dict[str, int] = {}
+    for w in words:
+        wl = w.lower()
+        if wl in stopwords:
+            continue
+        if len(wl) < 4:
+            continue
+        counts[wl] = counts.get(wl, 0) + 1
+
+    top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+    return [w for w, _ in top]
 
 
 def detect_content_type(text: str) -> str:
-    """Detect the type of content in text"""
+    """Classify chunk content for downstream prompting/display."""
+    if not text:
+        return "text"
+
     text_lower = text.lower()
-    
-    # Check for formulas
-    if re.search(r'[=+\-*/^].*\d', text) or re.search(r'\d.*[=+\-*/^]', text):
-        if any(char in text for char in ['∫', '∑', '√', 'Σ', 'π']):
-            return "formula"
-    
-    # Check for definitions
-    if re.search(r'\b(is defined as|refers to|means|is the)\b', text_lower):
+    if re.search(r"\b(is defined as|refers to|means|is the)\b", text_lower):
         return "definition"
-    
-    # Check for processes/steps
-    if re.search(r'\b(step \d|first|second|third|then|next|finally)\b', text_lower):
-        return "process"
-    
+    if re.search(r"\b(example|e\.g\.|for example)\b", text_lower):
+        return "example"
+    if re.search(r"\b(quiz|question|answer)\b", text_lower):
+        return "qa"
+    if re.search(r"\b(theorem|lemma|proof)\b", text_lower):
+        return "theory"
+    if re.search(r"[=<>±×÷]|\b(sin|cos|tan|log|ln)\b", text_lower):
+        return "formula"
+    if re.search(r"(^|\n)\s*(•|-|\*)\s+", text):
+        return "list"
     return "text"
-
-
-def _log_job(session: Session, job_id: int, level: str, message: str) -> None:
-    """Add a log entry to a job"""
-    log = JobLog(
-        job_id=job_id,
-        level=level,
-        message=message
-    )
-    session.add(log)
-    session.commit()

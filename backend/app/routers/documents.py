@@ -11,16 +11,17 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.database import get_session
 from app.config import settings
 from app.models.user import User
-from app.models.document import Document, DocumentStatus
+from app.models.document import Document, DocumentStatus, DocumentPage, Chunk
 from app.models.course import Course
 from app.models.job import ProcessingJob, JobStatus, JobType
 from app.schemas.document import (
     DocumentResponse, DocumentListResponse, DocumentDetail,
-    DocumentUpdate
+    DocumentUpdate, DocumentPageResponse, ChunkResponse
 )
 from app.services.document import DocumentService
 from app.routers.dependencies import get_current_user
@@ -116,19 +117,33 @@ async def upload_document(
         user_id=current_user.id,
         job_type=JobType.PDF_EXTRACTION,
         document_id=document.id,
-        status=JobStatus.PENDING
+        status=JobStatus.PENDING,
+        parameters={
+            "ocr_enabled": settings.ocr_enabled,
+            "ocr_threshold": settings.ocr_text_threshold,
+        },
     )
     session.add(job)
     await session.commit()
     await session.refresh(job)
     
-    # Queue processing task (runs in background with mocked Celery)
+    # Run processing (local dev uses celery_mock which executes synchronously)
     try:
-        process_document_task.delay(job.id)
+        result = process_document_task.delay(job.id)
+        if getattr(result, "state", "SUCCESS") == "FAILURE":
+            job.status = JobStatus.FAILED
+            job.error_message = str(getattr(result, "result", "Task failed"))
+            document.status = DocumentStatus.FAILED
+            document.processing_error = job.error_message
+            await session.commit()
+        else:
+            # Processing writes via a separate sync session; reload document to reflect results
+            await session.refresh(document)
     except Exception as e:
-        # If task fails to queue, mark job as failed
         job.status = JobStatus.FAILED
-        job.error_message = f"Failed to queue task: {str(e)}"
+        job.error_message = f"Failed to run task: {str(e)}"
+        document.status = DocumentStatus.FAILED
+        document.processing_error = job.error_message
         await session.commit()
     
     return DocumentResponse.model_validate(document)
@@ -195,13 +210,14 @@ async def get_document(
     """
     Get document details including processing status and extracted content
     """
-    result = await session.execute(
+    # Load the base document
+    doc_result = await session.execute(
         select(Document).where(
             Document.id == document_id,
-            Document.user_id == current_user.id
+            Document.user_id == current_user.id,
         )
     )
-    document = result.scalar_one_or_none()
+    document = doc_result.scalar_one_or_none()
     
     if not document:
         raise HTTPException(
@@ -209,7 +225,23 @@ async def get_document(
             detail="Document not found"
         )
     
-    return DocumentDetail.model_validate(document)
+    # Load related content explicitly (avoid lazy-load / MissingGreenlet)
+    pages_result = await session.execute(
+        select(DocumentPage)
+        .where(DocumentPage.document_id == document.id)
+        .order_by(DocumentPage.page_number)
+    )
+    chunks_result = await session.execute(
+        select(Chunk)
+        .where(Chunk.document_id == document.id)
+        .order_by(Chunk.chunk_index)
+    )
+
+    base = DocumentResponse.model_validate(document).model_dump()
+    base["pages"] = [DocumentPageResponse.model_validate(p).model_dump() for p in pages_result.scalars().all()]
+    base["chunks"] = [ChunkResponse.model_validate(c).model_dump() for c in chunks_result.scalars().all()]
+
+    return DocumentDetail(**base)
 
 
 @router.put("/{document_id}", response_model=DocumentResponse)
@@ -324,7 +356,7 @@ async def reprocess_document(
             detail="Document not found"
         )
     
-    if document.status not in [DocumentStatus.ERROR, DocumentStatus.PROCESSED]:
+    if document.status not in [DocumentStatus.ERROR, DocumentStatus.FAILED, DocumentStatus.PROCESSED]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Document cannot be reprocessed in current state"
@@ -332,15 +364,20 @@ async def reprocess_document(
     
     # Reset document status
     document.status = DocumentStatus.PENDING
-    document.error_message = None
+    document.processing_error = None
     document.updated_at = datetime.utcnow()
     
     # Create new processing job
     job = ProcessingJob(
         user_id=current_user.id,
-        job_type=JobType.DOCUMENT_PROCESSING,
+        job_type=JobType.PDF_EXTRACTION,
+        document_id=document.id,
         status=JobStatus.PENDING,
-        metadata={"document_id": document.id, "reprocess": True}
+        parameters={
+            "reprocess": True,
+            "ocr_enabled": settings.ocr_enabled,
+            "ocr_threshold": settings.ocr_text_threshold,
+        },
     )
     session.add(job)
     await session.commit()
@@ -348,6 +385,6 @@ async def reprocess_document(
     await session.refresh(document)
     
     # Queue processing
-    process_document_task.delay(document.id, job.id)
+    process_document_task.delay(job.id)
     
     return DocumentResponse.model_validate(document)

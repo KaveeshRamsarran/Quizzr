@@ -60,12 +60,15 @@ class DocumentResponse(BaseModel):
     filename: str
     original_filename: str
     file_size: int
+    mime_type: str = "application/pdf"
     title: Optional[str]
     description: Optional[str]
     page_count: int
     style: str
     status: str
     processing_error: Optional[str]
+    # Frontend compatibility
+    error_message: Optional[str] = None
     ocr_used: bool
     ocr_pages: Optional[List[int]]
     headings: Optional[dict]
@@ -80,12 +83,36 @@ class DocumentResponse(BaseModel):
     deck_count: int = 0
     quiz_count: int = 0
     
-    @field_serializer('style', 'status')
-    def serialize_enum(self, value):
-        """Convert enum to string"""
-        if hasattr(value, 'value'):
+    @field_serializer("style")
+    def serialize_style(self, value):
+        if hasattr(value, "value"):
             return value.value
-        return str(value) if value else None
+        return str(value) if value is not None else None
+
+    @field_serializer("status")
+    def serialize_status(self, value):
+        """Map internal processing statuses to the simplified frontend statuses."""
+        raw = value.value if hasattr(value, "value") else (str(value) if value is not None else "")
+        raw = raw.lower()
+
+        if raw in {"pending"}:
+            return "pending"
+        if raw in {"extracting", "chunking", "running", "processing"}:
+            return "processing"
+        if raw in {"completed", "processed"}:
+            return "processed"
+        if raw in {"failed", "error"}:
+            return "error"
+
+        return raw or "pending"
+
+    @field_serializer("error_message")
+    def serialize_error_message(self, value):
+        # Prefer explicit value if set, else mirror processing_error
+        if value is not None:
+            return value
+        # model may provide processing_error attribute
+        return getattr(self, "processing_error", None)
     
     class Config:
         from_attributes = True

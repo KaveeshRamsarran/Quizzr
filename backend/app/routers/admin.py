@@ -271,7 +271,7 @@ async def retry_job(
     if job.job_type == JobType.DOCUMENT_PROCESSING:
         document_id = job.metadata.get("document_id")
         if document_id:
-            process_document_task.delay(document_id, job.id)
+            process_document_task.delay(job.id)
     elif job.job_type == JobType.DECK_GENERATION:
         generate_deck_task.delay(job.id, job.metadata)
     elif job.job_type == JobType.QUIZ_GENERATION:

@@ -4,6 +4,7 @@ Provides mock implementations when Celery is not available
 """
 
 import asyncio
+import inspect
 from functools import wraps
 
 
@@ -35,12 +36,29 @@ class MockTask:
         """Execute synchronously and return mock result"""
         result = MockAsyncResult(f"mock-{self.name}")
         try:
+            call_args = list(args)
+
+            # Support Celery bound-task signatures: def task(self, ...)
+            # Real Celery injects `self` automatically; our mock must do it.
+            try:
+                sig = inspect.signature(self.func)
+                params = list(sig.parameters.values())
+                if params and params[0].name in {"self", "task"}:
+                    # If caller didn't provide the bound self explicitly, inject it.
+                    if len(call_args) == (len(params) - 1):
+                        dummy = type("MockBoundTask", (), {})()
+                        dummy.request = type("MockRequest", (), {"id": f"mock-{self.name}"})()
+                        call_args = [dummy] + call_args
+            except Exception:
+                # If signature inspection fails, just proceed
+                pass
+
             # For async functions, we need to run them
             if asyncio.iscoroutinefunction(self.func):
                 loop = asyncio.get_event_loop()
-                result.result = loop.run_until_complete(self.func(*args, **kwargs))
+                result.result = loop.run_until_complete(self.func(*call_args, **kwargs))
             else:
-                result.result = self.func(*args, **kwargs)
+                result.result = self.func(*call_args, **kwargs)
             result.state = "SUCCESS"
         except Exception as e:
             result.state = "FAILURE"

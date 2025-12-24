@@ -51,7 +51,7 @@ async def generate_deck(
             detail="Document not found"
         )
     
-    if document.status != DocumentStatus.PROCESSED:
+    if document.status not in {DocumentStatus.PROCESSED, DocumentStatus.COMPLETED}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Document is not ready for generation. Status: {document.status.value}"
@@ -62,13 +62,7 @@ async def generate_deck(
         user_id=current_user.id,
         job_type=JobType.DECK_GENERATION,
         status=JobStatus.PENDING,
-        metadata={
-            "document_id": request.document_id,
-            "card_count": request.card_count,
-            "card_types": [ct.value for ct in request.card_types] if request.card_types else None,
-            "difficulty": request.difficulty,
-            "focus_topics": request.focus_topics
-        }
+        parameters=request.model_dump()
     )
     session.add(job)
     await session.commit()
@@ -81,7 +75,10 @@ async def generate_deck(
         job_id=job.id,
         status=GenerationJobStatus.PENDING,
         message="Deck generation started",
-        created_at=job.created_at
+        progress=job.progress,
+        result_id=None,
+        created_at=job.created_at,
+        completed_at=job.completed_at,
     )
 
 
@@ -110,7 +107,7 @@ async def generate_quiz(
             detail="Document not found"
         )
     
-    if document.status != DocumentStatus.PROCESSED:
+    if document.status not in {DocumentStatus.PROCESSED, DocumentStatus.COMPLETED}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Document is not ready for generation. Status: {document.status.value}"
@@ -121,13 +118,7 @@ async def generate_quiz(
         user_id=current_user.id,
         job_type=JobType.QUIZ_GENERATION,
         status=JobStatus.PENDING,
-        metadata={
-            "document_id": request.document_id,
-            "question_count": request.question_count,
-            "question_types": [qt.value for qt in request.question_types] if request.question_types else None,
-            "difficulty": request.difficulty,
-            "focus_topics": request.focus_topics
-        }
+        parameters=request.model_dump()
     )
     session.add(job)
     await session.commit()
@@ -140,7 +131,10 @@ async def generate_quiz(
         job_id=job.id,
         status=GenerationJobStatus.PENDING,
         message="Quiz generation started",
-        created_at=job.created_at
+        progress=job.progress,
+        result_id=None,
+        created_at=job.created_at,
+        completed_at=job.completed_at,
     )
 
 
@@ -170,19 +164,25 @@ async def get_generation_status(
     # Map job status to generation status
     status_map = {
         JobStatus.PENDING: GenerationJobStatus.PENDING,
-        JobStatus.PROCESSING: GenerationJobStatus.PROCESSING,
+        JobStatus.RUNNING: GenerationJobStatus.PROCESSING,
+        JobStatus.RETRYING: GenerationJobStatus.PROCESSING,
         JobStatus.COMPLETED: GenerationJobStatus.COMPLETED,
-        JobStatus.FAILED: GenerationJobStatus.FAILED
+        JobStatus.FAILED: GenerationJobStatus.FAILED,
+        JobStatus.CANCELLED: GenerationJobStatus.FAILED,
     }
     
+    result_id = None
+    if job.result:
+        result_id = job.result.get("deck_id") or job.result.get("quiz_id")
+
     return GenerationJobResponse(
         job_id=job.id,
         status=status_map.get(job.status, GenerationJobStatus.PENDING),
-        message=job.error_message if job.status == JobStatus.FAILED else None,
+        message=job.error_message if job.status in {JobStatus.FAILED, JobStatus.CANCELLED} else None,
         progress=job.progress,
-        result_id=job.result.get("deck_id") or job.result.get("quiz_id") if job.result else None,
+        result_id=result_id,
         created_at=job.created_at,
-        completed_at=job.completed_at
+        completed_at=job.completed_at,
     )
 
 
@@ -215,20 +215,22 @@ async def list_generation_jobs(
     
     status_map = {
         JobStatus.PENDING: GenerationJobStatus.PENDING,
-        JobStatus.PROCESSING: GenerationJobStatus.PROCESSING,
+        JobStatus.RUNNING: GenerationJobStatus.PROCESSING,
+        JobStatus.RETRYING: GenerationJobStatus.PROCESSING,
         JobStatus.COMPLETED: GenerationJobStatus.COMPLETED,
-        JobStatus.FAILED: GenerationJobStatus.FAILED
+        JobStatus.FAILED: GenerationJobStatus.FAILED,
+        JobStatus.CANCELLED: GenerationJobStatus.FAILED,
     }
     
     return [
         GenerationJobResponse(
             job_id=job.id,
             status=status_map.get(job.status, GenerationJobStatus.PENDING),
-            message=job.error_message if job.status == JobStatus.FAILED else None,
+            message=job.error_message if job.status in {JobStatus.FAILED, JobStatus.CANCELLED} else None,
             progress=job.progress,
-            result_id=job.result.get("deck_id") or job.result.get("quiz_id") if job.result else None,
+            result_id=(job.result.get("deck_id") or job.result.get("quiz_id")) if job.result else None,
             created_at=job.created_at,
-            completed_at=job.completed_at
+            completed_at=job.completed_at,
         )
         for job in jobs
     ]
@@ -257,14 +259,14 @@ async def cancel_generation_job(
             detail="Job not found"
         )
     
-    if job.status not in [JobStatus.PENDING, JobStatus.PROCESSING]:
+    if job.status not in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.RETRYING]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot cancel completed or failed job"
         )
     
-    # Mark job as failed/cancelled
-    job.status = JobStatus.FAILED
+    # Mark job as cancelled
+    job.status = JobStatus.CANCELLED
     job.error_message = "Cancelled by user"
     job.completed_at = datetime.utcnow()
     
