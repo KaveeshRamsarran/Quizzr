@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     # Local/Pluggable LLM (recommended: Ollama)
     # llm_provider: 'ollama' (default) or 'openai' (OpenAI or OpenAI-compatible)
     llm_provider: str = "ollama"
-    # Example Ollama models: 'llama3.1', 'llama3.1:8b', custom model name, etc.
-    llm_model: str = "llama3.1"
+    # Example Ollama models: 'llama3.2:3b', 'llama3.1:8b', custom model name, etc.
+    llm_model: str = "llama3.2:3b"
     ollama_base_url: str = "http://localhost:11434"
     
     # File Upload

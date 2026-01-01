@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 import asyncio
 from typing import AsyncGenerator, Generator
 from httpx import AsyncClient, ASGITransport
@@ -34,7 +35,7 @@ def event_loop() -> Generator:
     loop.close()
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Create a fresh database session for each test."""
     async with test_engine.begin() as conn:
@@ -47,7 +48,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create a test client with the test database session."""
     async def override_get_db():
@@ -74,7 +75,7 @@ def test_user_data():
     }
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def authenticated_user(client: AsyncClient, test_user_data: dict):
     """Create and authenticate a test user."""
     # Register user

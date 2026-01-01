@@ -44,8 +44,12 @@ async def register(
     # Create user
     user = await auth_service.create_user(user_data)
     
-    # Generate tokens
+    # Generate tokens and persist refresh token so /refresh works
     tokens = auth_service.create_tokens(user)
+    user.refresh_token = tokens["refresh_token"]
+    user.refresh_token_expires = tokens["refresh_expires"]
+    await session.commit()
+    await session.refresh(user)
     
     return TokenResponse(
         access_token=tokens["access_token"],
@@ -102,22 +106,15 @@ async def refresh_token(
     auth_service = AuthService(session)
     
     result = await auth_service.refresh_tokens(token_data.refresh_token)
-    
+
     if not result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token"
         )
-    
-    user, tokens = result
-    
-    return TokenResponse(
-        access_token=tokens["access_token"],
-        refresh_token=tokens["refresh_token"],
-        token_type="bearer",
-        expires_in=1800,
-        user=UserResponse.model_validate(user)
-    )
+
+    # AuthService.refresh_tokens returns a TokenResponse
+    return result
 
 
 @router.post("/guest", response_model=TokenResponse)
@@ -131,6 +128,11 @@ async def create_guest(
     auth_service = AuthService(session)
     
     user, tokens = await auth_service.create_guest_user()
+    # Persist refresh token for guest sessions too
+    user.refresh_token = tokens["refresh_token"]
+    user.refresh_token_expires = tokens["refresh_expires"]
+    await session.commit()
+    await session.refresh(user)
     
     return TokenResponse(
         access_token=tokens["access_token"],
@@ -276,8 +278,12 @@ async def convert_guest_to_user(
     await session.commit()
     await session.refresh(current_user)
     
-    # Generate new tokens
+    # Generate new tokens and persist refresh token
     tokens = auth_service.create_tokens(current_user)
+    current_user.refresh_token = tokens["refresh_token"]
+    current_user.refresh_token_expires = tokens["refresh_expires"]
+    await session.commit()
+    await session.refresh(current_user)
     
     return TokenResponse(
         access_token=tokens["access_token"],

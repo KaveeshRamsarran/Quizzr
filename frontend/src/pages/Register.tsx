@@ -111,7 +111,7 @@ export default function Register() {
                 placeholder="••••••••"
               />
               <p className="mt-1 text-sm text-gray-500">
-                At least 8 characters
+                At least 8 characters, with uppercase, lowercase, and a number
               </p>
             </div>
 

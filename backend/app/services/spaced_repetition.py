@@ -7,9 +7,11 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
 
 from app.models.spaced_repetition import SpacedRepetitionSchedule
 from app.models.deck import Card
+from app.models.tag import CardTag
 
 
 # Rating mappings
@@ -36,8 +38,56 @@ class SpacedRepetitionService:
     5. E-Factor minimum is 1.3
     """
     
-    def __init__(self, db: AsyncSession):
+    DEFAULT_EASE: float = 2.5
+    MIN_EASE: float = 1.3
+
+    def __init__(self, db: Optional[AsyncSession] = None):
         self.db = db
+
+    @classmethod
+    def calculate_next_review(
+        cls,
+        *,
+        quality: int,
+        ease_factor: float,
+        interval: int,
+        repetitions: int,
+    ) -> tuple[int, float]:
+        """Pure SM-2 step.
+
+        Returns:
+            (new_interval_days, new_ease_factor)
+        """
+        q = max(0, min(5, int(quality)))
+        ef = float(ease_factor)
+
+        # EF' = EF + (0.1 - (5-q) * (0.08 + (5-q) * 0.02))
+        ef = max(
+            cls.MIN_EASE,
+            ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)),
+        )
+
+        if q < 3:
+            # Failed review
+            return 1, ef
+
+        # Successful review
+        reps = int(repetitions)
+        prev_interval = int(interval)
+
+        if reps <= 0:
+            return 1, ef
+        if reps == 1:
+            return 6, ef
+
+        # Mature cards
+        next_interval = max(1, round(max(1, prev_interval) * ef))
+        return next_interval, ef
+
+    def _require_db(self) -> AsyncSession:
+        if self.db is None:
+            raise RuntimeError("SpacedRepetitionService requires a database session for this operation")
+        return self.db
     
     async def get_or_create_schedule(
         self,
@@ -45,7 +95,8 @@ class SpacedRepetitionService:
         card_id: int
     ) -> SpacedRepetitionSchedule:
         """Get existing schedule or create new one"""
-        result = await self.db.execute(
+        db = self._require_db()
+        result = await db.execute(
             select(SpacedRepetitionSchedule).where(
                 SpacedRepetitionSchedule.user_id == user_id,
                 SpacedRepetitionSchedule.card_id == card_id
@@ -62,9 +113,9 @@ class SpacedRepetitionService:
                 repetitions=0,
                 next_review=datetime.utcnow()
             )
-            self.db.add(schedule)
-            await self.db.flush()
-            await self.db.refresh(schedule)
+            db.add(schedule)
+            await db.flush()
+            await db.refresh(schedule)
         
         return schedule
     
@@ -93,7 +144,8 @@ class SpacedRepetitionService:
         schedule.update_schedule(quality)
         
         # Update card stats
-        card_result = await self.db.execute(
+        db = self._require_db()
+        card_result = await db.execute(
             select(Card).where(Card.id == card_id)
         )
         card = card_result.scalar_one_or_none()
@@ -108,8 +160,44 @@ class SpacedRepetitionService:
                 card.times_incorrect += 1
                 card.is_mastered = False
         
-        await self.db.flush()
-        await self.db.refresh(schedule)
+        await db.flush()
+        await db.refresh(schedule)
+        return schedule
+
+    async def process_review(
+        self,
+        *,
+        user_id: int,
+        card_id: int,
+        quality: int,
+        time_spent_ms: int | None = None,
+    ) -> SpacedRepetitionSchedule:
+        """Compatibility alias expected by the decks router.
+
+        Uses numeric SM-2 quality (0-5).
+        """
+        schedule = await self.get_or_create_schedule(user_id, card_id)
+
+        # Apply SM-2 algorithm
+        schedule.update_schedule(int(quality))
+
+        # Update card stats
+        db = self._require_db()
+        card_result = await db.execute(select(Card).where(Card.id == card_id))
+        card = card_result.scalar_one_or_none()
+        if card:
+            card.times_studied += 1
+            card.last_studied = datetime.utcnow()
+            if int(quality) >= 3:
+                card.times_correct += 1
+                if schedule.interval >= 21:
+                    card.is_mastered = True
+            else:
+                card.times_incorrect += 1
+                card.is_mastered = False
+
+        await db.flush()
+        await db.refresh(schedule)
         return schedule
     
     async def get_due_cards(
@@ -130,13 +218,16 @@ class SpacedRepetitionService:
                 Card.is_suspended == False
             )
         )
+
+        query = query.options(selectinload(Card.tags).selectinload(CardTag.tag))
         
         if deck_id:
             query = query.where(Card.deck_id == deck_id)
         
         query = query.order_by(SpacedRepetitionSchedule.next_review).limit(limit)
         
-        result = await self.db.execute(query)
+        db = self._require_db()
+        result = await db.execute(query)
         return list(result.scalars().all())
     
     async def get_new_cards(
@@ -152,7 +243,8 @@ class SpacedRepetitionService:
             .where(SpacedRepetitionSchedule.user_id == user_id)
         )
         
-        result = await self.db.execute(
+        db = self._require_db()
+        result = await db.execute(
             select(Card)
             .where(
                 Card.deck_id == deck_id,
@@ -217,7 +309,8 @@ class SpacedRepetitionService:
         # Count cards by status
         from sqlalchemy import func, case
         
-        result = await self.db.execute(
+        db = self._require_db()
+        result = await db.execute(
             select(
                 func.count(Card.id).label("total"),
                 func.sum(case((Card.is_mastered == True, 1), else_=0)).label("mastered"),
@@ -240,7 +333,7 @@ class SpacedRepetitionService:
         stats = result.first()
         
         # Count new cards (no schedule)
-        new_result = await self.db.execute(
+        new_result = await db.execute(
             select(func.count(Card.id))
             .select_from(Card)
             .outerjoin(

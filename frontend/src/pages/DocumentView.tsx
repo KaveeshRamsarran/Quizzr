@@ -103,7 +103,7 @@ export default function DocumentView() {
     
     try {
       // Fetch the PDF with authentication
-      const res = await fetch(`/api/documents/${documentId}/file`, {
+      const res = await fetch(`/api/v1/documents/${documentId}/file`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },

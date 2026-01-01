@@ -21,6 +21,18 @@ from app.routers.dependencies import get_current_user
 router = APIRouter(tags=["Analytics"])
 
 
+@router.get("", response_model=AnalyticsOverview)
+@router.get("/", response_model=AnalyticsOverview)
+async def get_analytics_root(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Base analytics endpoint (alias of /overview)."""
+    analytics_service = AnalyticsService(session)
+    overview = await analytics_service.get_overview(current_user.id)
+    return AnalyticsOverview(**overview)
+
+
 @router.get("/overview", response_model=AnalyticsOverview)
 async def get_overview(
     current_user: User = Depends(get_current_user),
@@ -102,14 +114,18 @@ async def get_streak_info(
     """
     Get current streak information
     """
+    last_study_at = getattr(current_user, "last_study_date", None)
+    current_streak = getattr(current_user, "study_streak", 0) or 0
+
     return {
-        "current_streak": current_user.current_streak,
-        "longest_streak": current_user.longest_streak,
-        "last_study_at": current_user.last_study_at,
-        "studied_today": (
-            current_user.last_study_at and 
-            current_user.last_study_at.date() == datetime.utcnow().date()
-        )
+        "current_streak": current_streak,
+        # This project currently does not persist a separate "longest streak".
+        # Return current streak for compatibility with the frontend.
+        "longest_streak": current_streak,
+        "last_study_at": last_study_at,
+        "studied_today": bool(
+            last_study_at and last_study_at.date() == datetime.utcnow().date()
+        ),
     }
 
 
@@ -129,23 +145,21 @@ async def get_cards_due_count(
     result = await session.execute(
         select(func.count(SpacedRepetitionSchedule.id)).where(
             SpacedRepetitionSchedule.user_id == current_user.id,
-            SpacedRepetitionSchedule.next_review_at <= now,
-            SpacedRepetitionSchedule.is_active == True
+            SpacedRepetitionSchedule.next_review <= now
         )
     )
-    due_count = result.scalar()
+    due_count = result.scalar() or 0
     
     # Also get cards due in next 24 hours
     tomorrow = now + timedelta(days=1)
     upcoming_result = await session.execute(
         select(func.count(SpacedRepetitionSchedule.id)).where(
             SpacedRepetitionSchedule.user_id == current_user.id,
-            SpacedRepetitionSchedule.next_review_at > now,
-            SpacedRepetitionSchedule.next_review_at <= tomorrow,
-            SpacedRepetitionSchedule.is_active == True
+            SpacedRepetitionSchedule.next_review > now,
+            SpacedRepetitionSchedule.next_review <= tomorrow
         )
     )
-    upcoming_count = upcoming_result.scalar()
+    upcoming_count = upcoming_result.scalar() or 0
     
     return {
         "due_now": due_count,

@@ -150,11 +150,13 @@ async def upload_document(
     return DocumentResponse.model_validate(document)
 
 
+@router.get("", response_model=DocumentListResponse)
 @router.get("/", response_model=DocumentListResponse)
 async def list_documents(
     course_id: Optional[int] = None,
     status: Optional[DocumentStatus] = None,
     search: Optional[str] = None,
+    skip: Optional[int] = Query(None, ge=0),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -186,6 +188,10 @@ async def list_documents(
     
     total = (await session.execute(count_query)).scalar()
     
+    # Support legacy skip/limit pagination
+    if skip is not None:
+        page = (skip // limit) + 1
+
     # Get paginated results
     query = query.order_by(Document.created_at.desc())
     query = query.offset((page - 1) * limit).limit(limit)
@@ -196,6 +202,7 @@ async def list_documents(
     return DocumentListResponse(
         documents=[DocumentResponse.model_validate(d) for d in documents],
         total=total,
+        skip=((page - 1) * limit),
         page=page,
         limit=limit,
         pages=(total + limit - 1) // limit

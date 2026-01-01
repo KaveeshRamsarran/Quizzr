@@ -3,6 +3,10 @@ Celery Application Configuration
 Background task queue for PDF processing and AI generation
 """
 
+from __future__ import annotations
+
+from urllib.parse import urlparse
+
 try:
     from celery import Celery
     CELERY_AVAILABLE = True
@@ -15,11 +19,14 @@ from app.config import settings
 
 
 if CELERY_AVAILABLE:
+    broker_url = (getattr(settings, "celery_broker_url", "") or "").strip() or settings.redis_url
+    backend_url = (getattr(settings, "celery_result_backend", "") or "").strip() or settings.redis_url
+
     # Create real Celery app
     celery_app = Celery(
         "quizzr",
-        broker=settings.celery_broker_url,
-        backend=settings.celery_result_backend,
+        broker=broker_url,
+        backend=backend_url,
         include=["app.tasks.document_tasks", "app.tasks.generation_tasks"]
     )
 else:
@@ -28,6 +35,15 @@ else:
 
 # Celery configuration - only for real Celery
 if CELERY_AVAILABLE:
+    # In local dev on Windows/macOS, users commonly don't have Redis/Celery running.
+    # If the broker points at localhost, run tasks eagerly in-process so uploads and
+    # generation still work.
+    parsed = urlparse(str(celery_app.conf.broker_url or ""))
+    broker_host = (parsed.hostname or "").lower()
+    if settings.environment == "development" and broker_host in {"localhost", "127.0.0.1", "::1"}:
+        celery_app.conf.task_always_eager = True
+        celery_app.conf.task_eager_propagates = True
+
     celery_app.conf.update(
     # Task settings
     task_serializer="json",

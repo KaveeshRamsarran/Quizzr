@@ -5,14 +5,17 @@ Request and response models for deck-related endpoints
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic.aliases import AliasChoices
+from pydantic import computed_field
 
 
 class CardCreate(BaseModel):
     """Schema for creating a card"""
     card_type: str = Field(default="basic")
-    front: str = Field(min_length=1)
-    back: str = Field(min_length=1)
+    front: str = Field(min_length=1, validation_alias=AliasChoices("front", "front_content"))
+    back: str = Field(min_length=1, validation_alias=AliasChoices("back", "back_content"))
     extra_explanation: Optional[str] = None
     example: Optional[str] = None
     mnemonic: Optional[str] = None
@@ -26,8 +29,8 @@ class CardCreate(BaseModel):
 
 class CardUpdate(BaseModel):
     """Schema for updating a card"""
-    front: Optional[str] = None
-    back: Optional[str] = None
+    front: Optional[str] = Field(default=None, validation_alias=AliasChoices("front", "front_content"))
+    back: Optional[str] = Field(default=None, validation_alias=AliasChoices("back", "back_content"))
     extra_explanation: Optional[str] = None
     example: Optional[str] = None
     mnemonic: Optional[str] = None
@@ -74,11 +77,50 @@ class CardResponse(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_serializer("card_type")
+    def serialize_card_type(self, value):
+        if hasattr(value, "value"):
+            return value.value
+        return str(value) if value is not None else "basic"
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def normalize_tags(cls, value):
+        if value is None:
+            return []
+        if isinstance(value, list):
+            if not value:
+                return []
+            if isinstance(value[0], str):
+                return value
+            # Card.tags is a list[CardTag]
+            normalized: List[str] = []
+            for item in value:
+                tag_obj = getattr(item, "tag", None)
+                tag_name = getattr(tag_obj, "name", None)
+                if tag_name:
+                    normalized.append(str(tag_name))
+            return normalized
+        return []
+
+    # Legacy field names expected by tests
+    @computed_field
+    @property
+    def front_content(self) -> str:
+        return self.front
+
+    @computed_field
+    @property
+    def back_content(self) -> str:
+        return self.back
+
 
 class CardStudyRequest(BaseModel):
     """Schema for recording card study result"""
-    rating: str = Field(..., pattern=r"^(again|hard|good|easy)$")
+    rating: Optional[str] = Field(default=None, pattern=r"^(again|hard|good|easy)$")
+    quality: Optional[int] = Field(default=None, ge=0, le=5)
     time_spent_seconds: Optional[int] = None
+    time_spent_ms: Optional[int] = None
 
 
 # Alias for compatibility
@@ -93,6 +135,17 @@ class CardStudyResponse(BaseModel):
     easiness: float
     repetitions: int
 
+    # Frontend/test compatibility
+    @computed_field
+    @property
+    def next_review_at(self) -> datetime:
+        return self.next_review
+
+    @computed_field
+    @property
+    def ease_factor(self) -> float:
+        return self.easiness
+
 
 # Alias for compatibility
 CardReviewResponse = CardStudyResponse
@@ -100,7 +153,7 @@ CardReviewResponse = CardStudyResponse
 
 class DeckCreate(BaseModel):
     """Schema for creating a deck"""
-    name: str = Field(min_length=1, max_length=255)
+    name: str = Field(min_length=1, max_length=255, validation_alias=AliasChoices("name", "title"))
     description: Optional[str] = None
     deck_type: str = Field(default="mixed")
     course_id: Optional[int] = None
@@ -110,7 +163,7 @@ class DeckCreate(BaseModel):
 
 class DeckUpdate(BaseModel):
     """Schema for updating a deck"""
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    name: Optional[str] = Field(None, min_length=1, max_length=255, validation_alias=AliasChoices("name", "title"))
     description: Optional[str] = None
     course_id: Optional[int] = None
     color: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
@@ -142,11 +195,37 @@ class DeckResponse(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_serializer("deck_type")
+    def serialize_deck_type(self, value):
+        if hasattr(value, "value"):
+            return value.value
+        return str(value) if value is not None else "mixed"
+
+    # Legacy/Frontend compatibility
+    @computed_field
+    @property
+    def title(self) -> str:
+        return self.name
+
+    @computed_field
+    @property
+    def document_id(self) -> Optional[int]:
+        return self.source_document_id
+
 
 class DeckListResponse(BaseModel):
     """Schema for deck list response"""
     decks: List[DeckResponse]
     total: int
+    page: int
+    limit: int
+    pages: int
+
+    # Legacy alias expected by tests
+    @computed_field
+    @property
+    def items(self) -> List[DeckResponse]:
+        return self.decks
 
 
 class DeckDetailResponse(DeckResponse):

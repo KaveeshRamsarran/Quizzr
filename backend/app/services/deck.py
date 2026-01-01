@@ -59,7 +59,11 @@ class DeckService:
         )
         
         if include_cards:
-            query = query.options(selectinload(Deck.cards))
+            query = query.options(
+                selectinload(Deck.cards)
+                .selectinload(Card.tags)
+                .selectinload(CardTag.tag)
+            )
         
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
@@ -160,7 +164,8 @@ class DeckService:
             await self._add_card_tags(card.id, card_data.tags)
         
         await self.db.refresh(card)
-        return card
+        # Re-load with relationships needed by response models
+        return await self.get_card(card.id, user_id)
     
     async def create_cards_bulk(
         self,
@@ -215,7 +220,7 @@ class DeckService:
             select(Card)
             .join(Deck)
             .where(Card.id == card_id, Deck.user_id == user_id)
-            .options(selectinload(Card.tags))
+            .options(selectinload(Card.tags).selectinload(CardTag.tag))
         )
         return result.scalar_one_or_none()
     
@@ -234,7 +239,7 @@ class DeckService:
         result = await self.db.execute(
             select(Card)
             .where(Card.deck_id == deck_id)
-            .options(selectinload(Card.tags))
+            .options(selectinload(Card.tags).selectinload(CardTag.tag))
             .order_by(Card.created_at)
             .limit(limit)
             .offset(offset)
@@ -269,7 +274,7 @@ class DeckService:
         
         await self.db.flush()
         await self.db.refresh(card)
-        return card
+        return await self.get_card(card.id, user_id)
     
     async def delete_card(self, card_id: int, user_id: int) -> bool:
         """Delete a card"""

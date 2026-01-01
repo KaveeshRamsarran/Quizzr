@@ -39,6 +39,7 @@ class QuizService:
             description=quiz_data.description,
             difficulty=QuizDifficulty(quiz_data.difficulty) if quiz_data.difficulty else QuizDifficulty.MIXED,
             time_limit_minutes=quiz_data.time_limit_minutes,
+            pass_percentage=getattr(quiz_data, "pass_percentage", 70),
             shuffle_questions=quiz_data.shuffle_questions,
             shuffle_options=quiz_data.shuffle_options,
             show_explanations=quiz_data.show_explanations,
@@ -52,6 +53,69 @@ class QuizService:
         await self.db.flush()
         await self.db.refresh(quiz)
         return quiz
+
+    async def create_question(self, quiz_id: int, question_data) -> QuizQuestion:
+        """Compatibility wrapper for router; delegates to add_question."""
+        # Normalize question_type values from tests/frontends
+        qtype = getattr(question_data, "question_type", "mcq")
+        if qtype == "multiple_choice":
+            qtype = "mcq"
+
+        options = getattr(question_data, "options", None)
+        # Tests may send options as list[str]
+        if options and isinstance(options, list) and options and isinstance(options[0], str):
+            options = [{"id": str(i), "text": opt} for i, opt in enumerate(options)]
+
+        question = await self.add_question(
+            quiz_id=quiz_id,
+            user_id=getattr(question_data, "user_id", 0) or 0,  # not used; quiz ownership checked in router
+            question_type=qtype,
+            question_text=question_data.question_text,
+            correct_answer=question_data.correct_answer,
+            options=options,
+            explanation=getattr(question_data, "explanation", None),
+            difficulty=getattr(question_data, "difficulty", 3),
+            points=getattr(question_data, "points", 1),
+            topic=getattr(question_data, "topic", None),
+            source_pages=getattr(question_data, "source_pages", None),
+            source_snippets=getattr(question_data, "source_snippets", None),
+        )
+        # add_question returns Optional; but router already checked quiz exists
+        return question
+
+    async def update_question(self, question_id: int, question_data) -> Optional[QuizQuestion]:
+        result = await self.db.execute(select(QuizQuestion).where(QuizQuestion.id == question_id))
+        question = result.scalar_one_or_none()
+        if not question:
+            return None
+
+        update_dict = question_data.model_dump(exclude_unset=True)
+        # Normalize question_type values
+        if "question_type" in update_dict and update_dict["question_type"] == "multiple_choice":
+            update_dict["question_type"] = "mcq"
+
+        # Normalize options
+        if "options" in update_dict and isinstance(update_dict["options"], list) and update_dict["options"]:
+            if isinstance(update_dict["options"][0], str):
+                update_dict["options"] = [
+                    {"id": str(i), "text": opt} for i, opt in enumerate(update_dict["options"])
+                ]
+
+        for field, value in update_dict.items():
+            setattr(question, field, value)
+
+        await self.db.flush()
+        await self.db.refresh(question)
+        return question
+
+    async def delete_question(self, question_id: int) -> bool:
+        result = await self.db.execute(select(QuizQuestion).where(QuizQuestion.id == question_id))
+        question = result.scalar_one_or_none()
+        if not question:
+            return False
+        await self.db.delete(question)
+        await self.db.flush()
+        return True
     
     async def get_quiz(
         self,

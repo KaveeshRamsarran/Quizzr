@@ -1,11 +1,17 @@
 # FastAPI and ASGI
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.34.0,<1.0
+python-multipart>=0.0.20,<1.0
 
 # Database
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
+# SQLAlchemy async engine is used throughout the app
+sqlalchemy[asyncio]>=2.0.41,<3
+# Default local dev DB URL uses sqlite+aiosqlite
+aiosqlite>=0.21.0,<1
+# Postgres async driver used when DATABASE_URL starts with postgresql://.
+# asyncpg does not currently provide wheels for Python 3.14, so avoid
+# installing it there; Docker uses Python 3.11 and will install it.
+asyncpg==0.30.0; python_version < '3.14'
 alembic==1.13.1
 
 # Authentication
@@ -19,18 +25,20 @@ celery==5.3.6
 
 # PDF Processing
 PyPDF2==3.0.1
-pdfplumber==0.10.3
-pdf2image==1.17.0
-pytesseract==0.3.10
-Pillow==10.2.0
+pdfplumber==0.10.3; python_version < '3.14'
+pdf2image==1.17.0; python_version < '3.14'
+pytesseract==0.3.10; python_version < '3.14'
+Pillow==10.2.0; python_version < '3.14'
 
 # AI/OpenAI
-openai==1.12.0
-tiktoken==0.5.2
+openai>=1.107,<2
+tiktoken==0.5.2; python_version < '3.14'
 
 # Validation and Config
-pydantic==2.5.3
-pydantic-settings==2.1.0
+# Keep compatible with FastAPI, but don't pin to versions that require
+# building pydantic-core from source on newer Python versions.
+pydantic>=2.12.0,<3
+pydantic-settings>=2.12.0,<3
 python-dotenv==1.0.0
 email-validator==2.1.0
 

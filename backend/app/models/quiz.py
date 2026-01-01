@@ -64,6 +64,7 @@ class Quiz(Base):
         default=QuizDifficulty.MIXED
     )
     time_limit_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    pass_percentage: Mapped[int] = mapped_column(Integer, default=70)
     question_count: Mapped[int] = mapped_column(Integer, default=0)
     shuffle_questions: Mapped[bool] = mapped_column(Boolean, default=True)
     shuffle_options: Mapped[bool] = mapped_column(Boolean, default=True)

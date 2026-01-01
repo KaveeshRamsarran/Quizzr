@@ -242,21 +242,18 @@ def recalculate_spaced_repetition() -> dict:
         # Find overdue schedules
         overdue = session.execute(
             select(SpacedRepetitionSchedule).where(
-                and_(
-                    SpacedRepetitionSchedule.next_review_at < now,
-                    SpacedRepetitionSchedule.is_active == True
-                )
+                SpacedRepetitionSchedule.next_review < now
             )
         ).scalars().all()
         
         updated = 0
         for schedule in overdue:
             # Calculate days overdue
-            days_overdue = (now - schedule.next_review_at).days
+            days_overdue = (now - schedule.next_review).days
             
             # Increase priority based on how overdue
             if days_overdue > 7:
-                schedule.ease_factor = max(1.3, schedule.ease_factor - 0.1)
+                schedule.easiness = max(1.3, schedule.easiness - 0.1)
             
             updated += 1
         

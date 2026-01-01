@@ -3,7 +3,7 @@ echo Starting Quizzr Backend and Frontend...
 echo.
 
 REM Start backend in new window
-start "Quizzr Backend" cmd /k "cd /d %~dp0backend && ..\venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8002"
+start "Quizzr Backend" cmd /k "cd /d %~dp0backend && ..\llama-stack-venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8002"
 
 REM Wait a bit for backend to start
 timeout /t 3 /nobreak > nul

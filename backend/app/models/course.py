@@ -3,12 +3,20 @@ Course Model
 Organizes documents, decks, and quizzes into courses
 """
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import String, DateTime, Integer, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.document import Document
+    from app.models.deck import Deck
+    from app.models.quiz import Quiz
 
 
 class Course(Base):

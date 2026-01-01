@@ -2,14 +2,22 @@
 User Model
 Handles user accounts, authentication, and preferences
 """
+from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import String, Boolean, Enum, DateTime, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.course import Course
+    from app.models.document import Document
+    from app.models.deck import Deck
+    from app.models.quiz import Quiz, QuizAttempt
+    from app.models.spaced_repetition import SpacedRepetitionSchedule
 
 
 class UserRole(str, enum.Enum):

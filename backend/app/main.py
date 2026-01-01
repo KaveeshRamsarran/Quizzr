@@ -151,10 +151,12 @@ async def root():
 
 
 # Include routers
-app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-app.include_router(documents.router, prefix="/documents", tags=["Documents"])
-app.include_router(generation.router, prefix="/generate", tags=["Generation"])
-app.include_router(decks.router, prefix="/decks", tags=["Decks"])
-app.include_router(quizzes.router, prefix="/quizzes", tags=["Quizzes"])
-app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
-app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+API_V1_PREFIX = "/api/v1"
+
+app.include_router(auth.router, prefix=f"{API_V1_PREFIX}/auth", tags=["Authentication"])
+app.include_router(documents.router, prefix=f"{API_V1_PREFIX}/documents", tags=["Documents"])
+app.include_router(generation.router, prefix=f"{API_V1_PREFIX}/generation", tags=["Generation"])
+app.include_router(decks.router, prefix=f"{API_V1_PREFIX}/decks", tags=["Decks"])
+app.include_router(quizzes.router, prefix=f"{API_V1_PREFIX}/quizzes", tags=["Quizzes"])
+app.include_router(analytics.router, prefix=f"{API_V1_PREFIX}/analytics", tags=["Analytics"])
+app.include_router(admin.router, prefix=f"{API_V1_PREFIX}/admin", tags=["Admin"])

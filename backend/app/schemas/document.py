@@ -5,7 +5,7 @@ Request and response models for document-related endpoints
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, computed_field
 
 
 class DocumentUploadResponse(BaseModel):
@@ -122,6 +122,16 @@ class DocumentListResponse(BaseModel):
     """Schema for document list response"""
     documents: List[DocumentResponse]
     total: int
+    skip: int = 0
+    page: int
+    limit: int
+    pages: int
+
+    # Legacy alias expected by tests
+    @computed_field
+    @property
+    def items(self) -> List[DocumentResponse]:
+        return self.documents
 
 
 class DocumentDetailResponse(DocumentResponse):

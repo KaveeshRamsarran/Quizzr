@@ -80,6 +80,20 @@ export default function Settings() {
       toast.error('Passwords do not match')
       return
     }
+
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters')
+      return
+    }
+
+    const hasUpper = /[A-Z]/.test(newPassword)
+    const hasLower = /[a-z]/.test(newPassword)
+    const hasDigit = /\d/.test(newPassword)
+    if (!hasUpper || !hasLower || !hasDigit) {
+      toast.error('Password must include uppercase, lowercase, and a number')
+      return
+    }
+
     passwordMutation.mutate({ currentPassword, newPassword })
   }
 

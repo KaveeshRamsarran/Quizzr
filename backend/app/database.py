@@ -3,6 +3,8 @@ Database Configuration
 SQLAlchemy async engine and session management
 """
 
+from typing import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import MetaData
@@ -64,7 +66,7 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency to get database session"""
     async with AsyncSessionLocal() as session:
         try:

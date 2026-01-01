@@ -26,6 +26,7 @@ from app.routers.dependencies import get_current_user
 router = APIRouter(tags=["Quizzes"])
 
 
+@router.post("", response_model=QuizResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=QuizResponse, status_code=status.HTTP_201_CREATED)
 async def create_quiz(
     quiz_data: QuizCreate,
@@ -55,6 +56,7 @@ async def create_quiz(
     return QuizResponse.model_validate(quiz)
 
 
+@router.get("", response_model=QuizListResponse)
 @router.get("/", response_model=QuizListResponse)
 async def list_quizzes(
     course_id: Optional[int] = None,
@@ -74,7 +76,7 @@ async def list_quizzes(
     
     if search:
         query = query.where(
-            Quiz.title.ilike(f"%{search}%") |
+            Quiz.name.ilike(f"%{search}%") |
             Quiz.description.ilike(f"%{search}%")
         )
     
@@ -111,7 +113,7 @@ async def get_quiz(
     Get quiz details including all questions
     """
     quiz_service = QuizService(session)
-    quiz = await quiz_service.get_quiz(quiz_id, current_user.id)
+    quiz = await quiz_service.get_quiz(quiz_id, current_user.id, include_questions=True)
     
     if not quiz:
         raise HTTPException(
@@ -184,7 +186,36 @@ async def create_question(
             detail="Quiz not found"
         )
     
-    question = await quiz_service.create_question(quiz_id, question_data)
+    # Compatibility: older clients/tests send different option shapes and question_type values
+    qtype = question_data.question_type
+    if qtype == "multiple_choice":
+        qtype = "mcq"
+
+    options = question_data.options
+    if options and isinstance(options, list) and options and isinstance(options[0], str):
+        options = [{"id": str(i), "text": opt} for i, opt in enumerate(options)]
+
+    question = await quiz_service.add_question(
+        quiz_id=quiz_id,
+        user_id=current_user.id,
+        question_type=qtype,
+        question_text=question_data.question_text,
+        correct_answer=question_data.correct_answer,
+        options=options,
+        explanation=question_data.explanation,
+        difficulty=question_data.difficulty,
+        points=question_data.points,
+        topic=question_data.topic,
+        source_pages=question_data.source_pages,
+        source_snippets=question_data.source_snippets,
+    )
+
+    if not question:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quiz not found",
+        )
+
     return QuizQuestionResponse.model_validate(question)
 
 
@@ -209,7 +240,7 @@ async def list_questions(
     result = await session.execute(
         select(QuizQuestion)
         .where(QuizQuestion.quiz_id == quiz_id)
-        .order_by(QuizQuestion.order_index)
+        .order_by(QuizQuestion.question_order)
     )
     questions = result.scalars().all()
     
@@ -276,6 +307,7 @@ async def delete_question(
 # Attempt endpoints
 
 @router.post("/{quiz_id}/start", response_model=QuizAttemptResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{quiz_id}/attempts", response_model=QuizAttemptResponse, status_code=status.HTTP_201_CREATED)
 async def start_quiz_attempt(
     quiz_id: int,
     current_user: User = Depends(get_current_user),
@@ -319,7 +351,7 @@ async def list_attempts(
     result = await session.execute(
         select(QuizAttempt)
         .where(QuizAttempt.quiz_id == quiz_id, QuizAttempt.user_id == current_user.id)
-        .order_by(QuizAttempt.started_at.desc())
+        .order_by(QuizAttempt.time_started.desc())
         .limit(limit)
     )
     attempts = result.scalars().all()
@@ -356,6 +388,7 @@ async def get_attempt(
 
 
 @router.post("/{quiz_id}/attempts/{attempt_id}/answer", response_model=dict)
+@router.post("/{quiz_id}/attempts/{attempt_id}/answers", response_model=dict)
 async def submit_answer(
     quiz_id: int,
     attempt_id: int,
@@ -384,23 +417,30 @@ async def submit_answer(
             detail="Attempt not found"
         )
     
-    if attempt.completed_at:
+    if attempt.time_completed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Attempt already completed"
         )
     
     # Submit answer
-    is_correct, feedback = await quiz_service.submit_answer(
+    result = await quiz_service.submit_answer(
         attempt_id=attempt_id,
+        user_id=current_user.id,
         question_id=answer.question_id,
-        given_answer=answer.answer,
-        time_spent_ms=answer.time_spent_ms
+        answer=answer.answer,
+        time_spent_seconds=(int(answer.time_spent_ms / 1000) if answer.time_spent_ms is not None else None),
     )
-    
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to submit answer",
+        )
+
     return {
-        "is_correct": is_correct,
-        "feedback": feedback
+        "is_correct": result.get("is_correct", False),
+        "feedback": result.get("explanation") or result.get("correct_answer"),
     }
 
 
@@ -415,6 +455,17 @@ async def finish_attempt(
     Finish a quiz attempt and get results
     """
     quiz_service = QuizService(session)
+
+    # Load quiz for pass threshold
+    quiz_result = await session.execute(
+        select(Quiz).where(Quiz.id == quiz_id, Quiz.user_id == current_user.id)
+    )
+    quiz = quiz_result.scalar_one_or_none()
+    if not quiz:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quiz not found",
+        )
     
     # Verify attempt
     result = await session.execute(
@@ -432,17 +483,28 @@ async def finish_attempt(
             detail="Attempt not found"
         )
     
-    if attempt.completed_at:
+    if attempt.time_completed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Attempt already completed"
         )
     
     # Complete attempt
-    results = await quiz_service.complete_attempt(attempt_id)
+    results = await quiz_service.finish_attempt(attempt_id, current_user.id)
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to finish attempt",
+        )
     
-    # Update user stats
-    current_user.total_quizzes_taken += 1
     await session.commit()
     
+    # Ensure legacy fields expected by tests exist
+    raw_score = float(results.get("score", 0) or 0) if isinstance(results, dict) else 0.0
+    percentage = int(round(raw_score * 100)) if raw_score <= 1 else int(round(raw_score))
+    passed = bool(percentage >= getattr(quiz, "pass_percentage", 70))
+    if isinstance(results, dict):
+        results.setdefault("completed", True)
+        results.setdefault("percentage", percentage)
+        results.setdefault("passed", passed)
     return AttemptResultResponse(**results)

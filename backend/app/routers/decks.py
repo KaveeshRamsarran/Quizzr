@@ -26,6 +26,7 @@ from app.routers.dependencies import get_current_user
 router = APIRouter(tags=["Decks"])
 
 
+@router.post("", response_model=DeckResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=DeckResponse, status_code=status.HTTP_201_CREATED)
 async def create_deck(
     deck_data: DeckCreate,
@@ -55,6 +56,7 @@ async def create_deck(
     return DeckResponse.model_validate(deck)
 
 
+@router.get("", response_model=DeckListResponse)
 @router.get("/", response_model=DeckListResponse)
 async def list_decks(
     course_id: Optional[int] = None,
@@ -74,7 +76,7 @@ async def list_decks(
     
     if search:
         query = query.where(
-            Deck.title.ilike(f"%{search}%") |
+            Deck.name.ilike(f"%{search}%") |
             Deck.description.ilike(f"%{search}%")
         )
     
@@ -111,7 +113,7 @@ async def get_deck(
     Get deck details including all cards
     """
     deck_service = DeckService(session)
-    deck = await deck_service.get_deck(deck_id, current_user.id)
+    deck = await deck_service.get_deck(deck_id, current_user.id, include_cards=True)
     
     if not deck:
         raise HTTPException(
@@ -185,7 +187,7 @@ async def create_card(
             detail="Deck not found"
         )
     
-    card = await deck_service.create_card(deck_id, card_data)
+    card = await deck_service.create_card(deck_id, current_user.id, card_data)
     return CardResponse.model_validate(card)
 
 
@@ -209,16 +211,9 @@ async def list_cards(
             detail="Deck not found"
         )
     
-    query = select(Card).where(Card.deck_id == deck_id)
-    
+    cards = await deck_service.get_deck_cards(deck_id, current_user.id)
     if needs_review is not None:
-        query = query.where(Card.needs_review == needs_review)
-    
-    query = query.order_by(Card.order_index)
-    
-    result = await session.execute(query)
-    cards = result.scalars().all()
-    
+        cards = [c for c in cards if c.needs_review == needs_review]
     return [CardResponse.model_validate(c) for c in cards]
 
 
@@ -243,7 +238,7 @@ async def update_card(
             detail="Deck not found"
         )
     
-    card = await deck_service.update_card(card_id, card_data)
+    card = await deck_service.update_card(card_id, current_user.id, card_data)
     if not card or card.deck_id != deck_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -273,7 +268,7 @@ async def delete_card(
             detail="Deck not found"
         )
     
-    deleted = await deck_service.delete_card(card_id)
+    deleted = await deck_service.delete_card(card_id, current_user.id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -284,6 +279,7 @@ async def delete_card(
 # Study endpoints
 
 @router.get("/{deck_id}/study", response_model=List[CardResponse])
+@router.get("/{deck_id}/due", response_model=List[CardResponse])
 async def get_study_cards(
     deck_id: int,
     limit: int = Query(20, ge=1, le=100),
@@ -342,42 +338,45 @@ async def review_card(
             detail="Card not found"
         )
     
-    # Map rating string to quality value
-    rating_map = {"again": 0, "hard": 1, "good": 2, "easy": 3}
-    quality = rating_map.get(review.rating, 2)
+    # Accept either legacy numeric quality (0-5) or rating string
+    if getattr(review, "quality", None) is not None:
+        quality = int(review.quality)
+    else:
+        rating_map = {"again": 0, "hard": 2, "good": 4, "easy": 5}
+        quality = rating_map.get((review.rating or "good"), 4)
     
     # Process review
     schedule = await sr_service.process_review(
         user_id=current_user.id,
         card_id=card_id,
         quality=quality,
-        time_spent_ms=review.time_spent_ms
+        time_spent_ms=getattr(review, "time_spent_ms", None)
     )
     
     # Update user study stats
-    current_user.total_cards_studied += 1
-    current_user.last_study_at = datetime.utcnow()
-    
-    # Update streak if first study today
-    today = datetime.utcnow().date()
-    if current_user.last_study_at is None or current_user.last_study_at.date() < today:
-        current_user.current_streak += 1
-        if current_user.current_streak > current_user.longest_streak:
-            current_user.longest_streak = current_user.current_streak
+    now = datetime.utcnow()
+    last = current_user.last_study_date
+    today = now.date()
+    # Update streak if this is the first study today
+    if last is None or last.date() < today:
+        current_user.study_streak = (current_user.study_streak or 0) + 1
+    current_user.last_study_date = now
     
     await session.commit()
     
     return CardReviewResponse(
         card_id=card_id,
-        next_review_at=schedule.next_review_at,
+        next_review=schedule.next_review,
         interval_days=schedule.interval,
-        ease_factor=schedule.ease_factor
+        easiness=schedule.easiness,
+        repetitions=schedule.repetitions,
     )
 
 
 # Export endpoints
 
 @router.get("/{deck_id}/export/csv")
+@router.get("/{deck_id}/export")
 async def export_deck_csv(
     deck_id: int,
     current_user: User = Depends(get_current_user),
@@ -395,13 +394,15 @@ async def export_deck_csv(
             detail="Deck not found"
         )
     
-    csv_content = await deck_service.export_deck_csv(deck_id)
+    csv_content = await deck_service.export_deck_csv(deck_id, current_user.id)
+    if csv_content is None:
+        csv_content = ""
     
     return Response(
         content=csv_content,
         media_type="text/csv",
         headers={
-            "Content-Disposition": f'attachment; filename="{deck.title}.csv"'
+            "Content-Disposition": f'attachment; filename="{deck.name}.csv"'
         }
     )
 

@@ -331,8 +331,8 @@ def extract_pdf_text(file_path: str) -> List[dict]:
 def run_ocr_on_page(file_path: str, page_number: int) -> tuple:
     """Run OCR on a specific page"""
     try:
-        from pdf2image import convert_from_path
-        import pytesseract
+        from pdf2image import convert_from_path  # type: ignore[import-not-found]
+        import pytesseract  # type: ignore[import-not-found]
         
         # Convert page to image
         images = convert_from_path(
