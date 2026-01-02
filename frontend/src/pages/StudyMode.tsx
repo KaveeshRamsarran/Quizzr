@@ -96,8 +96,8 @@ export default function StudyMode() {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <CheckIcon className="w-16 h-16 mx-auto text-green-500 mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">All caught up!</h2>
-        <p className="text-gray-600 mb-6">
+        <h2 className="text-2xl font-bold text-white mb-2">All caught up!</h2>
+        <p className="text-gray-400 mb-6">
           You've reviewed all due cards. Check back later for more.
         </p>
         <Link to={`/decks/${deckId}`} className="btn-primary">
@@ -113,36 +113,36 @@ export default function StudyMode() {
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6"
+          className="w-20 h-20 bg-green-900/50 rounded-full flex items-center justify-center mx-auto mb-6"
         >
-          <CheckIcon className="w-10 h-10 text-green-600" />
+          <CheckIcon className="w-10 h-10 text-green-400" />
         </motion.div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Session Complete!</h2>
-        <p className="text-gray-600 mb-6">
+        <h2 className="text-2xl font-bold text-white mb-2">Session Complete!</h2>
+        <p className="text-gray-400 mb-6">
           You reviewed {sessionStats.reviewed} cards.
         </p>
 
         <div className="grid grid-cols-4 gap-4 mb-8">
-          <div className="card p-4 text-center">
-            <p className="text-2xl font-bold text-red-600">{sessionStats.again}</p>
-            <p className="text-sm text-gray-500">Again</p>
+          <div className="card bg-gray-800 border-gray-700 p-4 text-center">
+            <p className="text-2xl font-bold text-red-400">{sessionStats.again}</p>
+            <p className="text-sm text-gray-400">Again</p>
           </div>
-          <div className="card p-4 text-center">
-            <p className="text-2xl font-bold text-orange-600">{sessionStats.hard}</p>
-            <p className="text-sm text-gray-500">Hard</p>
+          <div className="card bg-gray-800 border-gray-700 p-4 text-center">
+            <p className="text-2xl font-bold text-orange-400">{sessionStats.hard}</p>
+            <p className="text-sm text-gray-400">Hard</p>
           </div>
-          <div className="card p-4 text-center">
-            <p className="text-2xl font-bold text-green-600">{sessionStats.good}</p>
-            <p className="text-sm text-gray-500">Good</p>
+          <div className="card bg-gray-800 border-gray-700 p-4 text-center">
+            <p className="text-2xl font-bold text-green-400">{sessionStats.good}</p>
+            <p className="text-sm text-gray-400">Good</p>
           </div>
-          <div className="card p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600">{sessionStats.easy}</p>
-            <p className="text-sm text-gray-500">Easy</p>
+          <div className="card bg-gray-800 border-gray-700 p-4 text-center">
+            <p className="text-2xl font-bold text-blue-400">{sessionStats.easy}</p>
+            <p className="text-sm text-gray-400">Easy</p>
           </div>
         </div>
 
         <div className="flex gap-4 justify-center">
-          <Link to={`/decks/${deckId}`} className="btn-secondary">
+          <Link to={`/decks/${deckId}`} className="btn-secondary bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600">
             Back to Deck
           </Link>
           <button
@@ -167,18 +167,18 @@ export default function StudyMode() {
       <div className="flex items-center justify-between mb-6">
         <Link
           to={`/decks/${deckId}`}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
+          className="inline-flex items-center text-gray-400 hover:text-white"
         >
           <ArrowLeftIcon className="w-4 h-4 mr-2" />
           Exit
         </Link>
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-gray-400">
           {currentIndex + 1} / {studyCards.length}
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-8">
+      <div className="w-full bg-gray-700 rounded-full h-2 mb-8">
         <div
           className="bg-primary-500 h-2 rounded-full transition-all"
           style={{ width: `${((currentIndex + 1) / studyCards.length) * 100}%` }}
@@ -197,21 +197,21 @@ export default function StudyMode() {
           <div
             onClick={handleFlip}
             className={clsx(
-              'card min-h-[300px] p-8 cursor-pointer transition-transform duration-500 preserve-3d',
+              'card bg-gray-800 border-gray-700 min-h-[300px] p-8 cursor-pointer transition-transform duration-500 preserve-3d',
               isFlipped && 'rotate-y-180'
             )}
           >
             {/* Front */}
             <div className={clsx('backface-hidden', isFlipped && 'hidden')}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-medium px-2 py-1 bg-primary-100 text-primary-700 rounded">
+                <span className="text-xs font-medium px-2 py-1 bg-primary-900/50 text-primary-400 rounded">
                   Question
                 </span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-500">
                   Click to reveal answer
                 </span>
               </div>
-              <p className="text-xl text-gray-900 leading-relaxed">
+              <p className="text-xl text-white leading-relaxed">
                 {currentCard.front}
               </p>
             </div>
@@ -219,20 +219,20 @@ export default function StudyMode() {
             {/* Back */}
             <div className={clsx('backface-hidden rotate-y-180', !isFlipped && 'hidden')}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded">
+                <span className="text-xs font-medium px-2 py-1 bg-green-900/50 text-green-400 rounded">
                   Answer
                 </span>
               </div>
-              <p className="text-xl text-gray-900 leading-relaxed">
+              <p className="text-xl text-white leading-relaxed">
                 {currentCard.back}
               </p>
               {currentCard.source_snippets?.[0] && (
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <div className="flex items-center text-sm text-gray-500 mb-2">
+                <div className="mt-6 pt-4 border-t border-gray-700">
+                  <div className="flex items-center text-sm text-gray-400 mb-2">
                     <LightBulbIcon className="w-4 h-4 mr-1" />
                     Source
                   </div>
-                  <p className="text-sm text-gray-600 italic">
+                  <p className="text-sm text-gray-400 italic">
                     "{currentCard.source_snippets[0]}"
                   </p>
                 </div>
@@ -281,9 +281,9 @@ export default function StudyMode() {
       )}
 
       {/* Keyboard hint */}
-      <p className="text-center text-sm text-gray-400 mt-6">
-        Press <kbd className="px-2 py-1 bg-gray-100 rounded">Space</kbd> to flip,{' '}
-        <kbd className="px-2 py-1 bg-gray-100 rounded">1-4</kbd> to rate
+      <p className="text-center text-sm text-gray-500 mt-6">
+        Press <kbd className="px-2 py-1 bg-gray-700 rounded text-gray-300">Space</kbd> to flip,{' '}
+        <kbd className="px-2 py-1 bg-gray-700 rounded text-gray-300">1-4</kbd> to rate
       </p>
     </div>
   )

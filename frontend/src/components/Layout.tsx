@@ -33,9 +33,9 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Top navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+      <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex">
@@ -44,7 +44,7 @@ export default function Layout() {
                 <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-lg">Q</span>
                 </div>
-                <span className="ml-2 text-xl font-bold text-gray-900">Quizzr</span>
+                <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Quizzr</span>
               </Link>
 
               {/* Desktop navigation */}
@@ -56,8 +56,8 @@ export default function Layout() {
                     className={clsx(
                       'inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors',
                       location.pathname === item.href
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        ? 'bg-primary-50 dark:bg-primary-900/50 text-primary-700 dark:text-primary-400'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
                     )}
                   >
                     <item.icon className="w-5 h-5 mr-2" />
@@ -70,11 +70,11 @@ export default function Layout() {
             <div className="flex items-center">
               {/* User menu */}
               <Menu as="div" className="relative">
-                <Menu.Button className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                    <UserCircleIcon className="w-6 h-6 text-primary-600" />
+                <Menu.Button className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
+                    <UserCircleIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                   </div>
-                  <span className="hidden sm:block text-sm font-medium text-gray-700">
+                  <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-200">
                     {user?.name || user?.email?.split('@')[0] || 'User'}
                   </span>
                 </Menu.Button>
@@ -88,17 +88,17 @@ export default function Layout() {
                   leaveFrom="transform opacity-100 scale-100"
                   leaveTo="transform opacity-0 scale-95"
                 >
-                  <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none py-1">
+                  <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none py-1">
                     <Menu.Item>
                       {({ active }: { active: boolean }) => (
                         <Link
                           to="/settings"
                           className={clsx(
-                            'flex items-center px-4 py-2 text-sm',
-                            active ? 'bg-gray-100' : ''
+                            'flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200',
+                            active ? 'bg-gray-100 dark:bg-gray-700' : ''
                           )}
                         >
-                          <Cog6ToothIcon className="w-5 h-5 mr-2 text-gray-500" />
+                          <Cog6ToothIcon className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
                           Settings
                         </Link>
                       )}
@@ -108,11 +108,11 @@ export default function Layout() {
                         <button
                           onClick={handleLogout}
                           className={clsx(
-                            'flex items-center w-full px-4 py-2 text-sm text-left',
-                            active ? 'bg-gray-100' : ''
+                            'flex items-center w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-200',
+                            active ? 'bg-gray-100 dark:bg-gray-700' : ''
                           )}
                         >
-                          <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2 text-gray-500" />
+                          <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
                           Sign out
                         </button>
                       )}
@@ -123,8 +123,8 @@ export default function Layout() {
 
               {/* Mobile menu button */}
               <Menu as="div" className="sm:hidden ml-2">
-                <Menu.Button className="p-2 rounded-lg hover:bg-gray-100">
-                  <Bars3Icon className="w-6 h-6 text-gray-600" />
+                <Menu.Button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <Bars3Icon className="w-6 h-6 text-gray-600 dark:text-gray-300" />
                 </Menu.Button>
 
                 <Transition
@@ -136,7 +136,7 @@ export default function Layout() {
                   leaveFrom="transform opacity-100 scale-100"
                   leaveTo="transform opacity-0 scale-95"
                 >
-                  <Menu.Items className="absolute right-4 mt-2 w-56 origin-top-right bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none py-1">
+                  <Menu.Items className="absolute right-4 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none py-1">
                     {navigation.map((item) => (
                       <Menu.Item key={item.name}>
                         {({ active }: { active: boolean }) => (
@@ -144,10 +144,10 @@ export default function Layout() {
                             to={item.href}
                             className={clsx(
                               'flex items-center px-4 py-2 text-sm',
-                              active ? 'bg-gray-100' : '',
+                              active ? 'bg-gray-100 dark:bg-gray-700' : '',
                               location.pathname === item.href
-                                ? 'text-primary-600'
-                                : 'text-gray-700'
+                                ? 'text-primary-600 dark:text-primary-400'
+                                : 'text-gray-700 dark:text-gray-200'
                             )}
                           >
                             <item.icon className="w-5 h-5 mr-2" />

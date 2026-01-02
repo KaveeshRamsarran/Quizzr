@@ -43,7 +43,7 @@ const benefits = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
       {/* Navigation */}
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex justify-between items-center">
@@ -51,12 +51,12 @@ export default function Landing() {
             <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
               <span className="text-white font-bold text-xl">Q</span>
             </div>
-            <span className="ml-3 text-2xl font-bold text-gray-900">Quizzr</span>
+            <span className="ml-3 text-2xl font-bold text-white">Quizzr</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
               to="/login"
-              className="text-gray-600 hover:text-gray-900 font-medium"
+              className="text-gray-300 hover:text-white font-medium"
             >
               Sign in
             </Link>
@@ -77,10 +77,10 @@ export default function Landing() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="text-5xl md:text-6xl font-bold text-gray-900 tracking-tight"
+            className="text-5xl md:text-6xl font-bold text-white tracking-tight"
           >
             Study Smarter with
-            <span className="text-primary-600"> AI-Powered</span>
+            <span className="text-primary-400"> AI-Powered</span>
             <br />
             Flashcards & Quizzes
           </motion.h1>
@@ -89,7 +89,7 @@ export default function Landing() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="mt-6 text-xl text-gray-600 max-w-2xl mx-auto"
+            className="mt-6 text-xl text-gray-300 max-w-2xl mx-auto"
           >
             Upload your PDFs and let AI create personalized study materials.
             Master any subject with spaced repetition and adaptive quizzes.
@@ -110,7 +110,7 @@ export default function Landing() {
             </Link>
             <Link
               to="/login"
-              className="btn-secondary text-lg px-8 py-3"
+              className="btn bg-gray-700 text-white border border-gray-600 hover:bg-gray-600 text-lg px-8 py-3"
             >
               Watch Demo
             </Link>
@@ -124,13 +124,13 @@ export default function Landing() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mt-16 relative"
         >
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-8 max-w-4xl mx-auto">
-            <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-8 text-center">
-              <DocumentArrowUpIcon className="w-16 h-16 mx-auto text-primary-500 mb-4" />
-              <p className="text-lg text-gray-700">
+          <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-8 max-w-4xl mx-auto">
+            <div className="bg-gradient-to-br from-gray-700 to-gray-800 rounded-xl p-8 text-center border border-gray-600">
+              <DocumentArrowUpIcon className="w-16 h-16 mx-auto text-primary-400 mb-4" />
+              <p className="text-lg text-gray-200">
                 Drop your PDF here or click to upload
               </p>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-gray-400 mt-2">
                 Supports lecture notes, slides, textbooks up to 50MB
               </p>
             </div>
@@ -140,7 +140,7 @@ export default function Landing() {
 
       {/* Features */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
+        <h2 className="text-3xl font-bold text-center text-white mb-12">
           How Quizzr Works
         </h2>
         
@@ -154,13 +154,13 @@ export default function Landing() {
               viewport={{ once: true }}
               className="text-center"
             >
-              <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <feature.icon className="w-8 h-8 text-primary-600" />
+              <div className="w-16 h-16 bg-primary-900/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <feature.icon className="w-8 h-8 text-primary-400" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-white mb-2">
                 {feature.name}
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-400">
                 {feature.description}
               </p>
             </motion.div>
@@ -228,10 +228,10 @@ export default function Landing() {
 
       {/* CTA */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">
+        <h2 className="text-3xl font-bold text-white mb-4">
           Ready to study smarter?
         </h2>
-        <p className="text-xl text-gray-600 mb-8">
+        <p className="text-xl text-gray-300 mb-8">
           Join thousands of students who are acing their exams with Quizzr.
         </p>
         <Link
@@ -244,16 +244,16 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-50 border-t border-gray-200 py-12">
+      <footer className="bg-gray-900 border-t border-gray-700 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center mb-4 md:mb-0">
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold">Q</span>
               </div>
-              <span className="ml-2 text-lg font-bold text-gray-900">Quizzr</span>
+              <span className="ml-2 text-lg font-bold text-white">Quizzr</span>
             </div>
-            <p className="text-gray-500 text-sm">
+            <p className="text-gray-400 text-sm">
               © {new Date().getFullYear()} Quizzr. All rights reserved.
             </p>
           </div>

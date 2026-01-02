@@ -125,8 +125,8 @@ export default function Upload() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Upload Document</h1>
-        <p className="mt-2 text-gray-600">
+        <h1 className="text-2xl font-bold text-white">Upload Document</h1>
+        <p className="mt-2 text-gray-400">
           Upload a PDF and let AI generate flashcards and quizzes for you
         </p>
       </div>
@@ -136,10 +136,10 @@ export default function Upload() {
         <div
           {...getRootProps()}
           className={clsx(
-            'card p-12 border-2 border-dashed cursor-pointer transition-all',
+            'card bg-gray-800 border-gray-700 p-12 border-2 border-dashed cursor-pointer transition-all',
             isDragActive
-              ? 'border-primary-500 bg-primary-50'
-              : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50',
+              ? 'border-primary-500 bg-gray-700'
+              : 'border-gray-600 hover:border-primary-400 hover:bg-gray-700',
             uploadMutation.isPending && 'opacity-50 cursor-not-allowed'
           )}
         >
@@ -148,17 +148,17 @@ export default function Upload() {
             {uploadMutation.isPending ? (
               <>
                 <ArrowPathIcon className="w-16 h-16 mx-auto text-primary-500 animate-spin" />
-                <p className="mt-4 text-lg font-medium text-gray-900">
+                <p className="mt-4 text-lg font-medium text-white">
                   Uploading...
                 </p>
               </>
             ) : (
               <>
-                <DocumentArrowUpIcon className="w-16 h-16 mx-auto text-gray-400" />
-                <p className="mt-4 text-lg font-medium text-gray-900">
+                <DocumentArrowUpIcon className="w-16 h-16 mx-auto text-gray-500" />
+                <p className="mt-4 text-lg font-medium text-white">
                   {isDragActive ? 'Drop your PDF here' : 'Drag & drop your PDF here'}
                 </p>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-gray-400">
                   or click to browse (max 50MB)
                 </p>
               </>
@@ -169,22 +169,22 @@ export default function Upload() {
         // Document uploaded - show status and options
         <div className="space-y-6">
           {/* Document status card */}
-          <div className="card p-6">
+          <div className="card bg-gray-800 border-gray-700 p-6">
             <div className="flex items-start justify-between">
               <div className="flex items-center">
-                <DocumentIcon className="w-12 h-12 text-primary-500" />
+                <DocumentIcon className="w-12 h-12 text-primary-400" />
                 <div className="ml-4">
-                  <h3 className="font-medium text-gray-900">
+                  <h3 className="font-medium text-white">
                     {currentDoc?.title || currentDoc?.filename}
                   </h3>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-400">
                     {currentDoc?.page_count} pages • {((currentDoc?.file_size || 0) / 1024).toFixed(0)} KB
                   </p>
                 </div>
               </div>
               <button
                 onClick={resetUpload}
-                className="p-2 text-gray-400 hover:text-gray-500"
+                className="p-2 text-gray-500 hover:text-gray-400"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
@@ -195,17 +195,17 @@ export default function Upload() {
               {currentDoc?.status === 'pending' || currentDoc?.status === 'processing' ? (
                 <>
                   <ArrowPathIcon className="w-5 h-5 text-primary-500 animate-spin mr-2" />
-                  <span className="text-sm text-gray-600">Processing document...</span>
+                  <span className="text-sm text-gray-300">Processing document...</span>
                 </>
               ) : currentDoc?.status === 'processed' ? (
                 <>
                   <CheckCircleIcon className="w-5 h-5 text-green-500 mr-2" />
-                  <span className="text-sm text-green-600">Document processed successfully</span>
+                  <span className="text-sm text-green-400">Document processed successfully</span>
                 </>
               ) : (
                 <>
                   <ExclamationCircleIcon className="w-5 h-5 text-red-500 mr-2" />
-                  <span className="text-sm text-red-600">
+                  <span className="text-sm text-red-400">
                     {currentDoc?.error_message || 'Processing failed'}
                   </span>
                 </>
@@ -219,17 +219,17 @@ export default function Upload() {
               <button
                 onClick={() => generateDeckMutation.mutate(currentDoc.id)}
                 disabled={generateDeckMutation.isPending || generateQuizMutation.isPending}
-                className="card p-6 text-left hover:border-primary-500 hover:shadow-md transition-all disabled:opacity-50"
+                className="card bg-gray-800 border-gray-700 p-6 text-left hover:border-primary-500 hover:bg-gray-700 transition-all disabled:opacity-50"
               >
                 <div className="flex items-center mb-4">
-                  <div className="p-3 bg-purple-100 rounded-lg">
-                    <SparklesIcon className="w-6 h-6 text-purple-600" />
+                  <div className="p-3 bg-purple-900/50 rounded-lg">
+                    <SparklesIcon className="w-6 h-6 text-purple-400" />
                   </div>
-                  <h3 className="ml-3 text-lg font-semibold text-gray-900">
+                  <h3 className="ml-3 text-lg font-semibold text-white">
                     Generate Flashcards
                   </h3>
                 </div>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-400">
                   Create a deck of flashcards from key concepts in your document.
                   Perfect for spaced repetition study.
                 </p>
@@ -238,17 +238,17 @@ export default function Upload() {
               <button
                 onClick={() => generateQuizMutation.mutate(currentDoc.id)}
                 disabled={generateDeckMutation.isPending || generateQuizMutation.isPending}
-                className="card p-6 text-left hover:border-primary-500 hover:shadow-md transition-all disabled:opacity-50"
+                className="card bg-gray-800 border-gray-700 p-6 text-left hover:border-primary-500 hover:bg-gray-700 transition-all disabled:opacity-50"
               >
                 <div className="flex items-center mb-4">
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <SparklesIcon className="w-6 h-6 text-green-600" />
+                  <div className="p-3 bg-green-900/50 rounded-lg">
+                    <SparklesIcon className="w-6 h-6 text-green-400" />
                   </div>
-                  <h3 className="ml-3 text-lg font-semibold text-gray-900">
+                  <h3 className="ml-3 text-lg font-semibold text-white">
                     Generate Quiz
                   </h3>
                 </div>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-400">
                   Create a quiz with multiple choice, true/false, and fill-in-the-blank
                   questions.
                 </p>
@@ -258,27 +258,27 @@ export default function Upload() {
 
           {/* Generation progress */}
           {currentJob && currentJob.status !== 'completed' && currentJob.status !== 'failed' && (
-            <div className="card p-6">
+            <div className="card bg-gray-800 border-gray-700 p-6">
               <div className="flex items-center mb-4">
                 <ArrowPathIcon className="w-6 h-6 text-primary-500 animate-spin mr-3" />
-                <h3 className="font-medium text-gray-900">
+                <h3 className="font-medium text-white">
                   Generating {generationType === 'deck' ? 'Flashcards' : 'Quiz'}...
                 </h3>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-gray-600 rounded-full h-2">
                 <div
                   className="bg-primary-500 h-2 rounded-full transition-all duration-500"
                   style={{ width: `${currentJob.progress ?? 10}%` }}
                 />
               </div>
               <div className="mt-2 flex items-center justify-between gap-3">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-400">
                   Status: <span className="font-medium">{currentJob.status}</span>
                   {typeof currentJob.progress === 'number' ? ` • ${currentJob.progress}%` : ''}
                   {currentJob.job_id ? ` • Job #${currentJob.job_id}` : ''}
                 </p>
               </div>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-400">
                 {currentJob.message ||
                   "This can take a couple minutes depending on document size and generation."}
               </p>
@@ -287,14 +287,14 @@ export default function Upload() {
 
           {/* Generation complete */}
           {currentJob?.status === 'completed' && (
-            <div className="card p-6 bg-green-50 border-green-200">
+            <div className="card p-6 bg-green-900/30 border-green-700">
               <div className="flex items-center">
-                <CheckCircleIcon className="w-6 h-6 text-green-500 mr-3" />
+                <CheckCircleIcon className="w-6 h-6 text-green-400 mr-3" />
                 <div>
-                  <h3 className="font-medium text-green-900">
+                  <h3 className="font-medium text-green-300">
                     {generationType === 'deck' ? 'Flashcards' : 'Quiz'} Generated!
                   </h3>
-                  <p className="text-sm text-green-700">
+                  <p className="text-sm text-green-400">
                     Redirecting you to your new content...
                   </p>
                 </div>
@@ -304,20 +304,20 @@ export default function Upload() {
 
           {/* Generation failed */}
           {currentJob?.status === 'failed' && (
-            <div className="card p-6 bg-red-50 border-red-200">
+            <div className="card p-6 bg-red-900/30 border-red-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <ExclamationCircleIcon className="w-6 h-6 text-red-500 mr-3" />
+                  <ExclamationCircleIcon className="w-6 h-6 text-red-400 mr-3" />
                   <div>
-                    <h3 className="font-medium text-red-900">Generation Failed</h3>
-                    <p className="text-sm text-red-700">
+                    <h3 className="font-medium text-red-300">Generation Failed</h3>
+                    <p className="text-sm text-red-400">
                       {currentJob.message || 'An error occurred during generation'}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setGenerationJob(null)}
-                  className="btn-secondary text-sm"
+                  className="btn-secondary bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 text-sm"
                 >
                   Try Again
                 </button>

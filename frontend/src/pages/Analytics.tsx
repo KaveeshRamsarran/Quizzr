@@ -89,58 +89,58 @@ export default function Analytics() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Study Analytics</h1>
-        <p className="text-gray-600">Track your learning progress and performance</p>
+        <h1 className="text-2xl font-bold text-white">Study Analytics</h1>
+        <p className="text-gray-400">Track your learning progress and performance</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-6">
+        <div className="card bg-gray-800 border-gray-700 p-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-500">Current Streak</span>
+            <span className="text-gray-400">Current Streak</span>
             <FireIcon className="w-5 h-5 text-orange-500" />
           </div>
-          <p className="text-3xl font-bold text-gray-900">
+          <p className="text-3xl font-bold text-white">
             {overview.study_streak || 0} days
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-400">
             Best: {overview.longest_streak || 0} days
           </p>
         </div>
 
-        <div className="card p-6">
+        <div className="card bg-gray-800 border-gray-700 p-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-500">Cards Mastered</span>
+            <span className="text-gray-400">Cards Mastered</span>
             <TrophyIcon className="w-5 h-5 text-yellow-500" />
           </div>
-          <p className="text-3xl font-bold text-gray-900">
+          <p className="text-3xl font-bold text-white">
             {overview.cards_mastered || 0}
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-400">
             of {overview.total_cards || 0} total
           </p>
         </div>
 
-        <div className="card p-6">
+        <div className="card bg-gray-800 border-gray-700 p-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-500">Study Time</span>
+            <span className="text-gray-400">Study Time</span>
             <ClockIcon className="w-5 h-5 text-blue-500" />
           </div>
-          <p className="text-3xl font-bold text-gray-900">
+          <p className="text-3xl font-bold text-white">
             {Math.round((overview.total_study_time_minutes || 0) / 60)}h
           </p>
-          <p className="text-sm text-gray-500">total study time</p>
+          <p className="text-sm text-gray-400">total study time</p>
         </div>
 
-        <div className="card p-6">
+        <div className="card bg-gray-800 border-gray-700 p-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-500">Quiz Average</span>
+            <span className="text-gray-400">Quiz Average</span>
             <AcademicCapIcon className="w-5 h-5 text-green-500" />
           </div>
-          <p className="text-3xl font-bold text-gray-900">
+          <p className="text-3xl font-bold text-white">
             {overview.average_quiz_score || 0}%
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-400">
             {overview.quizzes_taken || 0} quizzes taken
           </p>
         </div>
@@ -149,18 +149,18 @@ export default function Analytics() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Study Activity */}
-        <div className="card p-6">
+        <div className="card bg-gray-800 border-gray-700 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-gray-900">Study Activity</h3>
-            <ChartBarIcon className="w-5 h-5 text-gray-400" />
+            <h3 className="font-semibold text-white">Study Activity</h3>
+            <ChartBarIcon className="w-5 h-5 text-gray-500" />
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={studyActivityData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" fontSize={12} />
-                <YAxis fontSize={12} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="date" fontSize={12} stroke="#9CA3AF" />
+                <YAxis fontSize={12} stroke="#9CA3AF" />
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }} labelStyle={{ color: '#F9FAFB' }} />
                 <Line
                   type="monotone"
                   dataKey="cards"
@@ -174,18 +174,18 @@ export default function Analytics() {
         </div>
 
         {/* Topic Mastery */}
-        <div className="card p-6">
+        <div className="card bg-gray-800 border-gray-700 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-gray-900">Topic Mastery</h3>
-            <BookOpenIcon className="w-5 h-5 text-gray-400" />
+            <h3 className="font-semibold text-white">Topic Mastery</h3>
+            <BookOpenIcon className="w-5 h-5 text-gray-500" />
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topicMasteryData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 100]} fontSize={12} />
-                <YAxis dataKey="name" type="category" width={80} fontSize={12} />
-                <Tooltip formatter={(value) => `${value}%`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis type="number" domain={[0, 100]} fontSize={12} stroke="#9CA3AF" />
+                <YAxis dataKey="name" type="category" width={80} fontSize={12} stroke="#9CA3AF" />
+                <Tooltip formatter={(value) => `${value}%`} contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }} labelStyle={{ color: '#F9FAFB' }} />
                 <Bar dataKey="mastery" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -196,8 +196,8 @@ export default function Analytics() {
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Card Status Distribution */}
-        <div className="card p-6">
-          <h3 className="font-semibold text-gray-900 mb-6">Card Status</h3>
+        <div className="card bg-gray-800 border-gray-700 p-6">
+          <h3 className="font-semibold text-white mb-6">Card Status</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -219,15 +219,15 @@ export default function Analytics() {
                     />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }} labelStyle={{ color: '#F9FAFB' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Recent Activity */}
-        <div className="card p-6 lg:col-span-2">
-          <h3 className="font-semibold text-gray-900 mb-4">Recent Sessions</h3>
+        <div className="card bg-gray-800 border-gray-700 p-6 lg:col-span-2">
+          <h3 className="font-semibold text-white mb-4">Recent Sessions</h3>
           {overview.recent_sessions?.length > 0 ? (
             <div className="space-y-3">
               {overview.recent_sessions
@@ -245,18 +245,18 @@ export default function Analytics() {
                   ) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                      className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0"
                     >
                       <div>
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-white">
                           Study session
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-400">
                           {session.cards_studied} cards • {session.questions_answered} questions •{' '}
                           {Math.round(session.duration_minutes)} min
                         </p>
                       </div>
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-gray-400">
                         {new Date(session.date).toLocaleDateString()}
                       </span>
                     </div>
@@ -264,7 +264,7 @@ export default function Analytics() {
                 )}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-gray-400 text-center py-8">
               No study sessions yet. Start studying to see your progress!
             </p>
           )}
@@ -272,24 +272,24 @@ export default function Analytics() {
       </div>
 
       {/* Performance Insights */}
-      <div className="card p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Performance Insights</h3>
+      <div className="card bg-gray-800 border-gray-700 p-6">
+        <h3 className="font-semibold text-white mb-4">Performance Insights</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <p className="text-green-600 font-medium mb-1">Strongest Topic</p>
-            <p className="text-lg text-gray-900">
+          <div className="text-center p-4 bg-green-900/30 rounded-lg">
+            <p className="text-green-400 font-medium mb-1">Strongest Topic</p>
+            <p className="text-lg text-white">
               {strongestTopic || 'N/A'}
             </p>
           </div>
-          <div className="text-center p-4 bg-orange-50 rounded-lg">
-            <p className="text-orange-600 font-medium mb-1">Needs Work</p>
-            <p className="text-lg text-gray-900">
+          <div className="text-center p-4 bg-orange-900/30 rounded-lg">
+            <p className="text-orange-400 font-medium mb-1">Needs Work</p>
+            <p className="text-lg text-white">
               {weakestTopic || 'N/A'}
             </p>
           </div>
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <p className="text-blue-600 font-medium mb-1">Best Study Time</p>
-            <p className="text-lg text-gray-900">
+          <div className="text-center p-4 bg-blue-900/30 rounded-lg">
+            <p className="text-blue-400 font-medium mb-1">Best Study Time</p>
+            <p className="text-lg text-white">
               {bestStudyDay ? new Date(bestStudyDay).toLocaleDateString() : 'N/A'}
             </p>
           </div>

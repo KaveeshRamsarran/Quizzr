@@ -44,29 +44,29 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex items-center justify-center">
           <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
             <span className="text-white font-bold text-2xl">Q</span>
           </div>
         </Link>
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-bold text-white">
           Sign in to Quizzr
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-gray-400">
           Or{' '}
-          <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
+          <Link to="/register" className="font-medium text-primary-400 hover:text-primary-300">
             create a new account
           </Link>
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-lg sm:rounded-xl sm:px-10">
+        <div className="bg-gray-800 py-8 px-4 shadow-lg sm:rounded-xl sm:px-10 border border-gray-700">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="label">
+              <label htmlFor="email" className="label text-gray-200">
                 Email address
               </label>
               <input
@@ -77,13 +77,13 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input"
+                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="label">
+              <label htmlFor="password" className="label text-gray-200">
                 Password
               </label>
               <input
@@ -94,7 +94,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input"
+                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 placeholder="••••••••"
               />
             </div>
@@ -113,10 +113,10 @@ export default function Login() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
+                <div className="w-full border-t border-gray-600" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-white px-2 text-gray-500">Or continue with</span>
+                <span className="bg-gray-800 px-2 text-gray-400">Or continue with</span>
               </div>
             </div>
 
@@ -124,7 +124,7 @@ export default function Login() {
               <button
                 onClick={handleGuestLogin}
                 disabled={loading}
-                className="btn-secondary w-full"
+                className="btn-secondary w-full bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
               >
                 Try as Guest
               </button>

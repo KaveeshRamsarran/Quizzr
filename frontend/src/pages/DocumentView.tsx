@@ -136,9 +136,9 @@ export default function DocumentView() {
   if (!document) {
     return (
       <div className="text-center py-12">
-        <DocumentIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900">Document not found</h2>
-        <Link to="/dashboard" className="text-primary-600 mt-2 inline-block">
+        <DocumentIcon className="w-16 h-16 mx-auto text-gray-600 mb-4" />
+        <h2 className="text-xl font-semibold text-white">Document not found</h2>
+        <Link to="/dashboard" className="text-primary-400 mt-2 inline-block">
           Return to Dashboard
         </Link>
       </div>
@@ -146,10 +146,10 @@ export default function DocumentView() {
   }
 
   const statusColors = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    processing: 'bg-blue-100 text-blue-800',
-    processed: 'bg-green-100 text-green-800',
-    error: 'bg-red-100 text-red-800',
+    pending: 'bg-yellow-900 text-yellow-300',
+    processing: 'bg-blue-900 text-blue-300',
+    processed: 'bg-green-900 text-green-300',
+    error: 'bg-red-900 text-red-300',
   }
 
   return (
@@ -158,7 +158,7 @@ export default function DocumentView() {
       <div className="mb-6">
         <Link
           to="/dashboard"
-          className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          className="inline-flex items-center text-gray-400 hover:text-white mb-4"
         >
           <ArrowLeftIcon className="w-4 h-4 mr-2" />
           Back to Dashboard
@@ -166,12 +166,12 @@ export default function DocumentView() {
         
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center">
-            <DocumentIcon className="w-12 h-12 text-primary-500" />
+            <DocumentIcon className="w-12 h-12 text-primary-400" />
             <div className="ml-4">
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-white">
                 {document.title || document.filename}
               </h1>
-              <p className="text-gray-500">
+              <p className="text-gray-400">
                 {document.original_filename}
               </p>
             </div>
@@ -186,7 +186,7 @@ export default function DocumentView() {
               disabled={deleteMutation.isPending}
               className="btn-secondary"
             >
-              <TrashIcon className="w-5 h-5 mr-2 text-red-600" />
+              <TrashIcon className="w-5 h-5 mr-2 text-red-400" />
               Delete
             </button>
             <span
@@ -202,43 +202,43 @@ export default function DocumentView() {
       </div>
 
       {/* Document info */}
-      <div className="card p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Document Details</h2>
+      <div className="card bg-gray-800 border-gray-700 p-6 mb-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Document Details</h2>
         <dl className="grid grid-cols-2 gap-4">
           <div>
-            <dt className="text-sm text-gray-500">Pages</dt>
-            <dd className="text-lg font-medium text-gray-900">
+            <dt className="text-sm text-gray-400">Pages</dt>
+            <dd className="text-lg font-medium text-white">
               {document.page_count || 'Unknown'}
             </dd>
           </div>
           <div>
-            <dt className="text-sm text-gray-500">File Size</dt>
-            <dd className="text-lg font-medium text-gray-900">
+            <dt className="text-sm text-gray-400">File Size</dt>
+            <dd className="text-lg font-medium text-white">
               {(document.file_size / 1024).toFixed(1)} KB
             </dd>
           </div>
           <div>
-            <dt className="text-sm text-gray-500">Uploaded</dt>
-            <dd className="text-lg font-medium text-gray-900">
+            <dt className="text-sm text-gray-400">Uploaded</dt>
+            <dd className="text-lg font-medium text-white">
               {new Date(document.created_at).toLocaleDateString()}
             </dd>
           </div>
           <div>
-            <dt className="text-sm text-gray-500">Type</dt>
-            <dd className="text-lg font-medium text-gray-900">
+            <dt className="text-sm text-gray-400">Type</dt>
+            <dd className="text-lg font-medium text-white">
               {document.mime_type}
             </dd>
           </div>
         </dl>
 
         {document.description && (
-          <div className="mt-4 pt-4 border-t">
-            <dt className="text-sm text-gray-500 mb-1">Description</dt>
-            <dd className="text-gray-900">{document.description}</dd>
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <dt className="text-sm text-gray-400 mb-1">Description</dt>
+            <dd className="text-gray-200">{document.description}</dd>
           </div>
         )}
 
-        <div className="mt-6 pt-4 border-t flex items-center gap-3">
+        <div className="mt-6 pt-4 border-t border-gray-700 flex items-center gap-3">
           <button
             onClick={() => loadPdf()}
             className="btn-primary"
@@ -254,17 +254,17 @@ export default function DocumentView() {
           <button
             onClick={() => generateDeckMutation.mutate()}
             disabled={generateDeckMutation.isPending || generateQuizMutation.isPending}
-            className="card p-6 text-left hover:border-primary-500 hover:shadow-md transition-all disabled:opacity-50"
+            className="card bg-gray-800 border-gray-700 p-6 text-left hover:border-primary-500 hover:shadow-md transition-all disabled:opacity-50"
           >
             <div className="flex items-center mb-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <SparklesIcon className="w-5 h-5 text-purple-600" />
+              <div className="p-2 bg-purple-900/50 rounded-lg">
+                <SparklesIcon className="w-5 h-5 text-purple-400" />
               </div>
-              <h3 className="ml-3 font-semibold text-gray-900">
+              <h3 className="ml-3 font-semibold text-white">
                 Generate Flashcards
               </h3>
             </div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-400">
               Generate a deck directly from this document (fast mode).
             </p>
           </button>
@@ -272,17 +272,17 @@ export default function DocumentView() {
           <button
             onClick={() => generateQuizMutation.mutate()}
             disabled={generateDeckMutation.isPending || generateQuizMutation.isPending}
-            className="card p-6 text-left hover:border-primary-500 hover:shadow-md transition-all disabled:opacity-50"
+            className="card bg-gray-800 border-gray-700 p-6 text-left hover:border-primary-500 hover:shadow-md transition-all disabled:opacity-50"
           >
             <div className="flex items-center mb-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <SparklesIcon className="w-5 h-5 text-green-600" />
+              <div className="p-2 bg-green-900/50 rounded-lg">
+                <SparklesIcon className="w-5 h-5 text-green-400" />
               </div>
-              <h3 className="ml-3 font-semibold text-gray-900">
+              <h3 className="ml-3 font-semibold text-white">
                 Generate Quiz
               </h3>
             </div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-400">
               Generate a quiz directly from this document (fast mode).
             </p>
           </button>
@@ -290,34 +290,34 @@ export default function DocumentView() {
       )}
 
       {currentJob && currentJob.status !== 'completed' && currentJob.status !== 'failed' && (
-        <div className="card p-6 mt-6">
+        <div className="card bg-gray-800 border-gray-700 p-6 mt-6">
           <div className="flex items-center mb-4">
-            <div className="w-5 h-5 mr-3 animate-spin rounded-full border-b-2 border-primary-600" />
-            <h3 className="font-medium text-gray-900">
+            <div className="w-5 h-5 mr-3 animate-spin rounded-full border-b-2 border-primary-400" />
+            <h3 className="font-medium text-white">
               Generating {generationType === 'deck' ? 'Flashcards' : 'Quiz'}...
             </h3>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-gray-700 rounded-full h-2">
             <div
               className="bg-primary-500 h-2 rounded-full transition-all duration-500"
               style={{ width: `${currentJob.progress ?? 10}%` }}
             />
           </div>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-400">
             Status: <span className="font-medium">{currentJob.status}</span>
             {typeof currentJob.progress === 'number' ? ` • ${currentJob.progress}%` : ''}
             {currentJob.job_id ? ` • Job #${currentJob.job_id}` : ''}
           </p>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-400">
             {currentJob.message || 'Working… this can take a bit depending on the PDF.'}
           </p>
         </div>
       )}
 
       {currentJob?.status === 'failed' && (
-        <div className="card p-6 mt-6 bg-red-50 border-red-200">
-          <h3 className="font-medium text-red-900">Generation Failed</h3>
-          <p className="text-sm text-red-700 mt-1">{currentJob.message || 'An error occurred.'}</p>
+        <div className="card bg-red-900/30 border-red-800 p-6 mt-6">
+          <h3 className="font-medium text-red-300">Generation Failed</h3>
+          <p className="text-sm text-red-400 mt-1">{currentJob.message || 'An error occurred.'}</p>
           <button
             onClick={() => {
               setGenerationJob(null)
@@ -331,9 +331,9 @@ export default function DocumentView() {
       )}
 
       {document.status === 'error' && (
-        <div className="card p-6 bg-red-50 border-red-200">
-          <h3 className="font-medium text-red-900 mb-2">Processing Error</h3>
-          <p className="text-red-700">{document.error_message}</p>
+        <div className="card bg-red-900/30 border-red-800 p-6">
+          <h3 className="font-medium text-red-300 mb-2">Processing Error</h3>
+          <p className="text-red-400">{document.error_message}</p>
           <button
             onClick={() => documentsApi.reprocess(document.id)}
             className="btn-secondary mt-4"

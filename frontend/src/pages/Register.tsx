@@ -42,29 +42,29 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex items-center justify-center">
           <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
             <span className="text-white font-bold text-2xl">Q</span>
           </div>
         </Link>
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-bold text-white">
           Create your account
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-gray-400">
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
+          <Link to="/login" className="font-medium text-primary-400 hover:text-primary-300">
             Sign in
           </Link>
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-lg sm:rounded-xl sm:px-10">
+        <div className="bg-gray-800 py-8 px-4 shadow-lg sm:rounded-xl sm:px-10 border border-gray-700">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="displayName" className="label">
+              <label htmlFor="displayName" className="label text-gray-200">
                 Display name (optional)
               </label>
               <input
@@ -73,13 +73,13 @@ export default function Register() {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="input"
+                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 placeholder="John Doe"
               />
             </div>
 
             <div>
-              <label htmlFor="email" className="label">
+              <label htmlFor="email" className="label text-gray-200">
                 Email address
               </label>
               <input
@@ -90,13 +90,13 @@ export default function Register() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input"
+                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="label">
+              <label htmlFor="password" className="label text-gray-200">
                 Password
               </label>
               <input
@@ -107,16 +107,16 @@ export default function Register() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input"
+                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 placeholder="••••••••"
               />
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-400">
                 At least 8 characters, with uppercase, lowercase, and a number
               </p>
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="label">
+              <label htmlFor="confirmPassword" className="label text-gray-200">
                 Confirm password
               </label>
               <input
@@ -127,7 +127,7 @@ export default function Register() {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="input"
+                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 placeholder="••••••••"
               />
             </div>
@@ -143,13 +143,13 @@ export default function Register() {
             </div>
           </form>
 
-          <p className="mt-6 text-center text-xs text-gray-500">
+          <p className="mt-6 text-center text-xs text-gray-400">
             By creating an account, you agree to our{' '}
-            <a href="#" className="text-primary-600 hover:text-primary-500">
+            <a href="#" className="text-primary-400 hover:text-primary-300">
               Terms of Service
             </a>{' '}
             and{' '}
-            <a href="#" className="text-primary-600 hover:text-primary-500">
+            <a href="#" className="text-primary-400 hover:text-primary-300">
               Privacy Policy
             </a>
           </p>

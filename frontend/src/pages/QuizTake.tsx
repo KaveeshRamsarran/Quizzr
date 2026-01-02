@@ -129,44 +129,44 @@ export default function QuizTake() {
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="card p-8 text-center"
+          className="card bg-gray-800 border-gray-700 p-8 text-center"
         >
           <div
             className={clsx(
               'w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6',
-              passed ? 'bg-green-100' : 'bg-red-100'
+              passed ? 'bg-green-900/50' : 'bg-red-900/50'
             )}
           >
             {passed ? (
-              <CheckCircleIcon className="w-10 h-10 text-green-600" />
+              <CheckCircleIcon className="w-10 h-10 text-green-400" />
             ) : (
-              <XCircleIcon className="w-10 h-10 text-red-600" />
+              <XCircleIcon className="w-10 h-10 text-red-400" />
             )}
           </div>
 
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-white mb-2">
             {passed ? 'Congratulations!' : 'Keep Practicing!'}
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-400 mb-6">
             {passed
               ? 'You passed the quiz!'
               : "You didn't pass this time, but don't give up!"}
           </p>
 
           <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="card p-4 bg-gray-50">
-              <p className="text-3xl font-bold text-gray-900">{result.percentage}%</p>
-              <p className="text-sm text-gray-500">Score</p>
+            <div className="card bg-gray-700 border-gray-600 p-4">
+              <p className="text-3xl font-bold text-white">{result.percentage}%</p>
+              <p className="text-sm text-gray-400">Score</p>
             </div>
-            <div className="card p-4 bg-gray-50">
-              <p className="text-3xl font-bold text-green-600">{result.correct_count}</p>
-              <p className="text-sm text-gray-500">Correct</p>
+            <div className="card bg-gray-700 border-gray-600 p-4">
+              <p className="text-3xl font-bold text-green-400">{result.correct_count}</p>
+              <p className="text-sm text-gray-400">Correct</p>
             </div>
-            <div className="card p-4 bg-gray-50">
-              <p className="text-3xl font-bold text-red-600">
+            <div className="card bg-gray-700 border-gray-600 p-4">
+              <p className="text-3xl font-bold text-red-400">
                 {result.total_questions - result.correct_count}
               </p>
-              <p className="text-sm text-gray-500">Incorrect</p>
+              <p className="text-sm text-gray-400">Incorrect</p>
             </div>
           </div>
 
@@ -201,24 +201,24 @@ export default function QuizTake() {
       <div className="flex items-center justify-between mb-6">
         <Link
           to={`/quizzes/${quizId}`}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
+          className="inline-flex items-center text-gray-400 hover:text-white"
         >
           <ArrowLeftIcon className="w-4 h-4 mr-2" />
           Exit
         </Link>
         <div className="flex items-center gap-4">
-          <div className="flex items-center text-gray-600">
+          <div className="flex items-center text-gray-400">
             <ClockIcon className="w-5 h-5 mr-1" />
             {formatTime(elapsedTime)}
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-400">
             {currentIndex + 1} / {questions.length}
           </div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-8">
+      <div className="w-full bg-gray-700 rounded-full h-2 mb-8">
         <div
           className="bg-green-500 h-2 rounded-full transition-all"
           style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
@@ -233,21 +233,21 @@ export default function QuizTake() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
         >
-          <div className="card p-6 mb-6">
+          <div className="card bg-gray-800 border-gray-700 p-6 mb-6">
             <span
               className={clsx(
                 'inline-block mb-4 text-xs font-medium px-2 py-1 rounded',
                 currentQuestion.question_type === 'multiple_choice' &&
-                  'bg-blue-100 text-blue-700',
+                  'bg-blue-900 text-blue-300',
                 currentQuestion.question_type === 'true_false' &&
-                  'bg-purple-100 text-purple-700',
+                  'bg-purple-900 text-purple-300',
                 currentQuestion.question_type === 'fill_blank' &&
-                  'bg-orange-100 text-orange-700'
+                  'bg-orange-900 text-orange-300'
               )}
             >
               {currentQuestion.question_type.replace('_', ' ')}
             </span>
-            <h2 className="text-xl font-medium text-gray-900">
+            <h2 className="text-xl font-medium text-white">
               {currentQuestion.question_text}
             </h2>
           </div>
@@ -262,11 +262,11 @@ export default function QuizTake() {
                   className={clsx(
                     'w-full p-4 text-left rounded-lg border-2 transition-all',
                     selectedAnswer === option
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-primary-500 bg-primary-900/50'
+                      : 'border-gray-700 bg-gray-800 hover:border-gray-600'
                   )}
                 >
-                  <span className="font-medium text-gray-900">{option}</span>
+                  <span className="font-medium text-white">{option}</span>
                 </button>
               ))}
             </div>
@@ -281,8 +281,8 @@ export default function QuizTake() {
                   className={clsx(
                     'p-6 text-center rounded-lg border-2 transition-all font-medium',
                     selectedAnswer === option
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      ? 'border-primary-500 bg-primary-900/50 text-primary-300'
+                      : 'border-gray-700 bg-gray-800 hover:border-gray-600 text-gray-300'
                   )}
                 >
                   {option}

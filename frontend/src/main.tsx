@@ -6,15 +6,20 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './index.css'
 
-const savedTheme = localStorage.getItem('quizzr-theme') || 'light'
+// Default to dark mode
+const savedTheme = localStorage.getItem('quizzr-theme') || 'dark'
 const root = document.documentElement
-root.classList.remove('dark')
+root.classList.remove('dark', 'light')
 if (savedTheme === 'dark') {
   root.classList.add('dark')
 } else if (savedTheme === 'system') {
   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     root.classList.add('dark')
   }
+}
+// Set default theme in localStorage if not set
+if (!localStorage.getItem('quizzr-theme')) {
+  localStorage.setItem('quizzr-theme', 'dark')
 }
 
 const queryClient = new QueryClient({

@@ -83,10 +83,10 @@ export default function Dashboard() {
       {/* Welcome section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-white">
             Welcome back, {user?.name || user?.email?.split('@')[0] || 'Student'}!
           </h1>
-          <p className="mt-1 text-gray-600">
+          <p className="mt-1 text-gray-400">
             {overview?.study_streak ? (
               <span className="inline-flex items-center">
                 <FireIcon className="w-5 h-5 text-orange-500 mr-1" />
@@ -106,14 +106,14 @@ export default function Dashboard() {
       {/* Stats grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <div key={stat.name} className="card p-6">
+          <div key={stat.name} className="card bg-gray-800 border-gray-700 p-6">
             <div className="flex items-center">
               <div className={clsx('p-3 rounded-lg', stat.color)}>
                 <stat.icon className="w-6 h-6 text-white" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">{stat.name}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-sm font-medium text-gray-400">{stat.name}</p>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
               </div>
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function Dashboard() {
 
       {/* Quick actions */}
       {cardsDue && cardsDue.due_now > 0 && (
-        <div className="card p-6 bg-gradient-to-r from-primary-500 to-primary-600 text-white">
+        <div className="card p-6 bg-gradient-to-r from-primary-500 to-primary-600 text-white border-0">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold">Cards Ready for Review</h2>
@@ -144,21 +144,21 @@ export default function Dashboard() {
       {/* Recent content grid */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Recent Documents */}
-        <div className="card">
-          <div className="p-4 border-b border-gray-200">
+        <div className="card bg-gray-800 border-gray-700">
+          <div className="p-4 border-b border-gray-700">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Recent Documents</h3>
-              <Link to="/documents" className="text-sm text-primary-600 hover:text-primary-700">
+              <h3 className="font-semibold text-white">Recent Documents</h3>
+              <Link to="/documents" className="text-sm text-primary-400 hover:text-primary-300">
                 View all
               </Link>
             </div>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-700">
             {documents?.documents.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <DocumentIcon className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <div className="p-8 text-center text-gray-400">
+                <DocumentIcon className="w-12 h-12 mx-auto text-gray-600 mb-3" />
                 <p>No documents yet</p>
-                <Link to="/upload" className="text-primary-600 text-sm">
+                <Link to="/upload" className="text-primary-400 text-sm">
                   Upload your first PDF
                 </Link>
               </div>
@@ -167,14 +167,14 @@ export default function Dashboard() {
                 <Link
                   key={doc.id}
                   to={`/documents/${doc.id}`}
-                  className="flex items-center p-4 hover:bg-gray-50 transition-colors"
+                  className="flex items-center p-4 hover:bg-gray-700 transition-colors"
                 >
-                  <DocumentIcon className="w-10 h-10 text-gray-400" />
+                  <DocumentIcon className="w-10 h-10 text-gray-500" />
                   <div className="ml-3 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-white truncate">
                       {doc.title || doc.filename}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-400">
                       {doc.page_count} pages • {doc.status}
                     </p>
                   </div>
@@ -185,19 +185,19 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Decks */}
-        <div className="card">
-          <div className="p-4 border-b border-gray-200">
+        <div className="card bg-gray-800 border-gray-700">
+          <div className="p-4 border-b border-gray-700">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Recent Decks</h3>
-              <Link to="/dashboard" className="text-sm text-primary-600 hover:text-primary-700">
+              <h3 className="font-semibold text-white">Recent Decks</h3>
+              <Link to="/dashboard" className="text-sm text-primary-400 hover:text-primary-300">
                 View all
               </Link>
             </div>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-700">
             {decks?.decks.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <RectangleStackIcon className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <div className="p-8 text-center text-gray-400">
+                <RectangleStackIcon className="w-12 h-12 mx-auto text-gray-600 mb-3" />
                 <p>No decks yet</p>
                 <p className="text-sm">Generate from a document</p>
               </div>
@@ -206,19 +206,19 @@ export default function Dashboard() {
                 <Link
                   key={deck.id}
                   to={`/decks/${deck.id}`}
-                  className="flex items-center p-4 hover:bg-gray-50 transition-colors"
+                  className="flex items-center p-4 hover:bg-gray-700 transition-colors"
                 >
                   <RectangleStackIcon className="w-10 h-10 text-purple-400" />
                   <div className="ml-3 min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-white truncate">
                       {deck.title}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-400">
                       {deck.card_count} cards • {deck.mastered_count} mastered
                     </p>
                   </div>
                   <div className="ml-2">
-                    <div className="w-12 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="w-12 h-2 bg-gray-600 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-purple-500 rounded-full"
                         style={{
@@ -234,19 +234,19 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Quizzes */}
-        <div className="card">
-          <div className="p-4 border-b border-gray-200">
+        <div className="card bg-gray-800 border-gray-700">
+          <div className="p-4 border-b border-gray-700">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Recent Quizzes</h3>
-              <Link to="/dashboard" className="text-sm text-primary-600 hover:text-primary-700">
+              <h3 className="font-semibold text-white">Recent Quizzes</h3>
+              <Link to="/dashboard" className="text-sm text-primary-400 hover:text-primary-300">
                 View all
               </Link>
             </div>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-700">
             {quizzes?.quizzes.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <ClipboardDocumentListIcon className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <div className="p-8 text-center text-gray-400">
+                <ClipboardDocumentListIcon className="w-12 h-12 mx-auto text-gray-600 mb-3" />
                 <p>No quizzes yet</p>
                 <p className="text-sm">Generate from a document</p>
               </div>
@@ -255,23 +255,23 @@ export default function Dashboard() {
                 <Link
                   key={quiz.id}
                   to={`/quizzes/${quiz.id}`}
-                  className="flex items-center p-4 hover:bg-gray-50 transition-colors"
+                  className="flex items-center p-4 hover:bg-gray-700 transition-colors"
                 >
                   <ClipboardDocumentListIcon className="w-10 h-10 text-green-400" />
                   <div className="ml-3 min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-white truncate">
                       {quiz.title}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-400">
                       {quiz.question_count} questions • {quiz.attempts_count} attempts
                     </p>
                   </div>
                   {quiz.best_score !== null && (
                     <span className={clsx(
                       'text-sm font-medium px-2 py-1 rounded',
-                      quiz.best_score >= 80 ? 'bg-green-100 text-green-700' :
-                      quiz.best_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-red-100 text-red-700'
+                      quiz.best_score >= 80 ? 'bg-green-900 text-green-300' :
+                      quiz.best_score >= 60 ? 'bg-yellow-900 text-yellow-300' :
+                      'bg-red-900 text-red-300'
                     )}>
                       {quiz.best_score}%
                     </span>
