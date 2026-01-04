@@ -6,10 +6,9 @@ Celery periodic tasks for system maintenance and data cleanup
 from datetime import datetime, timedelta
 import structlog
 
-try:
-    from celery import shared_task
-except ImportError:
-    from app.celery_mock import shared_task
+# Always use celery_mock for local development to avoid requiring Redis
+# Real Celery is only needed in production with a proper broker
+from app.celery_mock import shared_task
 
 from sqlalchemy import create_engine, select, func, and_
 from sqlalchemy.orm import sessionmaker, Session

@@ -3,15 +3,15 @@ Document Processing Tasks
 PDF extraction, OCR, and chunking background tasks
 """
 
+import os
 import re
 from datetime import datetime
 from typing import Optional, List
 import structlog
 
-try:
-    from celery import shared_task
-except ImportError:
-    from app.celery_mock import shared_task
+# Always use celery_mock for local development to avoid requiring Redis
+# Real Celery is only needed in production with a proper broker
+from app.celery_mock import shared_task
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.engine.url import make_url
@@ -110,7 +110,23 @@ def process_document_task(self, job_id: int) -> dict:
         job.current_step = "Extracting text"
         session.commit()
         
-        pages_data = extract_pdf_text(document.file_path)
+        # Resolve file path - handle both absolute and relative paths
+        file_path = document.file_path
+        if not os.path.isabs(file_path):
+            # Resolve relative to upload_dir setting
+            base_dir = os.path.abspath(settings.upload_dir)
+            # Handle paths that include 'uploads/' prefix
+            if file_path.startswith('uploads') or file_path.startswith('uploads/') or file_path.startswith('uploads\\'):
+                file_path = os.path.join(os.path.dirname(base_dir), file_path)
+            else:
+                file_path = os.path.join(base_dir, file_path)
+        
+        if not os.path.exists(file_path):
+            raise ValueError(f"PDF file not found: {file_path}")
+        
+        _log_job(session, job.id, "info", f"Processing file: {file_path}")
+        
+        pages_data = extract_pdf_text(file_path)
         
         if not pages_data:
             raise ValueError("Failed to extract any text from PDF")
@@ -131,7 +147,7 @@ def process_document_task(self, job_id: int) -> dict:
                 session.commit()
                 
                 ocr_text, confidence = run_ocr_on_page(
-                    document.file_path,
+                    file_path,  # Use resolved absolute path
                     page_data["page_number"]
                 )
                 

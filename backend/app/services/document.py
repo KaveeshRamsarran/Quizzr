@@ -54,23 +54,28 @@ class DocumentService:
         return hashlib.sha256(content).hexdigest()
     
     async def save_file(self, content: bytes, filename: str) -> str:
-        """Save file to upload directory and return relative path"""
-        upload_dir = Path(settings.upload_dir)
+        """Save file to upload directory and return absolute path"""
+        upload_dir = Path(settings.upload_dir).resolve()
         upload_dir.mkdir(parents=True, exist_ok=True)
         
         file_path = upload_dir / filename
         async with aiofiles.open(file_path, "wb") as f:
             await f.write(content)
         
-        # Return path relative to upload_dir (e.g., "filename.pdf" or "uploads/filename.pdf")
-        # to match what the retrieval endpoint expects
-        return os.path.join("uploads", filename)
+        # Return absolute path for reliable access from any working directory
+        return str(file_path)
     
     async def delete_file(self, file_path: str) -> bool:
         """Delete a file from storage"""
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            # Handle both absolute paths and relative paths
+            if os.path.isabs(file_path):
+                full_path = file_path
+            else:
+                full_path = os.path.join(Path(settings.upload_dir).resolve(), os.path.basename(file_path))
+            
+            if os.path.exists(full_path):
+                os.remove(full_path)
                 return True
         except Exception:
             pass
