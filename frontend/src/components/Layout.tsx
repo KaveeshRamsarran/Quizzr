@@ -1,173 +1,104 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Fragment } from 'react'
-import { Menu, Transition } from '@headlessui/react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import {
-  HomeIcon,
-  DocumentArrowUpIcon,
-  DocumentTextIcon,
-  ChartBarIcon,
-  Cog6ToothIcon,
-  ArrowRightOnRectangleIcon,
-  UserCircleIcon,
-  Bars3Icon,
+  ArrowRightOnRectangleIcon, ChartBarIcon, DocumentTextIcon, HomeIcon, PlusIcon, QuestionMarkCircleIcon, RectangleStackIcon, Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '../stores/authStore'
-import clsx from 'clsx'
+import { authApi } from '../lib/api'
+import { Brand, Button } from './ui'
+import { initials } from '../lib/format'
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Upload', href: '/upload', icon: DocumentArrowUpIcon },
-  { name: 'Documents', href: '/documents', icon: DocumentTextIcon },
-  { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
-  { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
+const NAV = [
+  { to: '/dashboard', label: 'Home', icon: HomeIcon },
+  { to: '/documents', label: 'Documents', icon: DocumentTextIcon },
+  { to: '/decks', label: 'Flashcards', icon: RectangleStackIcon },
+  { to: '/quizzes', label: 'Quizzes', icon: QuestionMarkCircleIcon },
+  { to: '/analytics', label: 'Progress', icon: ChartBarIcon },
 ]
 
 export default function Layout() {
-  const location = useLocation()
-  const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { pathname } = useLocation()
 
-  const handleLogout = () => {
+  const signOut = async () => {
+    await authApi.logout()
     logout()
+    queryClient.clear()
     navigate('/')
   }
 
+  const isActive = (to: string) => pathname === to || pathname.startsWith(`${to}/`)
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Top navigation */}
-      <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              {/* Logo */}
-              <Link to="/dashboard" className="flex items-center">
-                <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">Q</span>
-                </div>
-                <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Quizzr</span>
-              </Link>
+    <div className="shell">
+      <a href="#main" className="skip-link">Skip to content</a>
 
-              {/* Desktop navigation */}
-              <div className="hidden sm:ml-8 sm:flex sm:space-x-4">
-                {navigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={clsx(
-                      'inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                      location.pathname === item.href
-                        ? 'bg-primary-50 dark:bg-primary-900/50 text-primary-700 dark:text-primary-400'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
-                    )}
-                  >
-                    <item.icon className="w-5 h-5 mr-2" />
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
+      <aside className="sidebar" aria-label="Sidebar">
+        <Link to="/dashboard" aria-label="Quizzr home"><Brand /></Link>
+
+        <Link to="/upload" className="btn btn--primary btn--block">
+          <PlusIcon aria-hidden="true" />
+          Upload a PDF
+        </Link>
+
+        <nav className="side-nav" aria-label="Main">
+          {NAV.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} className="side-link" aria-current={isActive(to) ? 'page' : undefined}>
+              {isActive(to) && <motion.span layoutId="side-active" className="side-link__bg" transition={{ type: 'spring', stiffness: 420, damping: 36 }} />}
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="side-foot">
+          {user?.is_guest && (
+            <Link to="/settings#account" className="notice notice--accent small" style={{ display: 'block' }}>
+              <strong style={{ display: 'block', color: 'var(--color-ink)' }}>Guest account</strong>
+              Add an email to keep your work.
+            </Link>
+          )}
+          <NavLink to="/settings" className="side-link" aria-current={isActive('/settings') ? 'page' : undefined}>
+            {isActive('/settings') && <motion.span layoutId="side-active" className="side-link__bg" transition={{ type: 'spring', stiffness: 420, damping: 36 }} />}
+            <Cog6ToothIcon aria-hidden="true" />
+            <span>Settings</span>
+          </NavLink>
+          <div className="user-chip">
+            <span className="avatar">{user?.is_guest ? 'G' : initials(user?.name)}</span>
+            <div className="min-w-0 flex-1">
+              <div className="row-title truncate small">{user?.is_guest ? 'Guest' : user?.name}</div>
+              <div className="tiny muted truncate">{user?.is_guest ? 'Not saved yet' : user?.email}</div>
             </div>
-
-            <div className="flex items-center">
-              {/* User menu */}
-              <Menu as="div" className="relative">
-                <Menu.Button className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                  <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                    <UserCircleIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
-                  </div>
-                  <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-200">
-                    {user?.name || user?.email?.split('@')[0] || 'User'}
-                  </span>
-                </Menu.Button>
-
-                <Transition
-                  as={Fragment}
-                  enter="transition ease-out duration-100"
-                  enterFrom="transform opacity-0 scale-95"
-                  enterTo="transform opacity-100 scale-100"
-                  leave="transition ease-in duration-75"
-                  leaveFrom="transform opacity-100 scale-100"
-                  leaveTo="transform opacity-0 scale-95"
-                >
-                  <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none py-1">
-                    <Menu.Item>
-                      {({ active }: { active: boolean }) => (
-                        <Link
-                          to="/settings"
-                          className={clsx(
-                            'flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200',
-                            active ? 'bg-gray-100 dark:bg-gray-700' : ''
-                          )}
-                        >
-                          <Cog6ToothIcon className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
-                          Settings
-                        </Link>
-                      )}
-                    </Menu.Item>
-                    <Menu.Item>
-                      {({ active }: { active: boolean }) => (
-                        <button
-                          onClick={handleLogout}
-                          className={clsx(
-                            'flex items-center w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-200',
-                            active ? 'bg-gray-100 dark:bg-gray-700' : ''
-                          )}
-                        >
-                          <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
-                          Sign out
-                        </button>
-                      )}
-                    </Menu.Item>
-                  </Menu.Items>
-                </Transition>
-              </Menu>
-
-              {/* Mobile menu button */}
-              <Menu as="div" className="sm:hidden ml-2">
-                <Menu.Button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <Bars3Icon className="w-6 h-6 text-gray-600 dark:text-gray-300" />
-                </Menu.Button>
-
-                <Transition
-                  as={Fragment}
-                  enter="transition ease-out duration-100"
-                  enterFrom="transform opacity-0 scale-95"
-                  enterTo="transform opacity-100 scale-100"
-                  leave="transition ease-in duration-75"
-                  leaveFrom="transform opacity-100 scale-100"
-                  leaveTo="transform opacity-0 scale-95"
-                >
-                  <Menu.Items className="absolute right-4 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none py-1">
-                    {navigation.map((item) => (
-                      <Menu.Item key={item.name}>
-                        {({ active }: { active: boolean }) => (
-                          <Link
-                            to={item.href}
-                            className={clsx(
-                              'flex items-center px-4 py-2 text-sm',
-                              active ? 'bg-gray-100 dark:bg-gray-700' : '',
-                              location.pathname === item.href
-                                ? 'text-primary-600 dark:text-primary-400'
-                                : 'text-gray-700 dark:text-gray-200'
-                            )}
-                          >
-                            <item.icon className="w-5 h-5 mr-2" />
-                            {item.name}
-                          </Link>
-                        )}
-                      </Menu.Item>
-                    ))}
-                  </Menu.Items>
-                </Transition>
-              </Menu>
-            </div>
+            <Button variant="ghost" size="sm" icon={<ArrowRightOnRectangleIcon />} aria-label="Sign out" title="Sign out" onClick={signOut} />
           </div>
         </div>
-      </nav>
+      </aside>
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
-      </main>
+      <div className="main">
+        <header className="mobile-top">
+          <Link to="/dashboard" aria-label="Quizzr home"><Brand /></Link>
+          <div className="flex items-center gap-1">
+            <Link to="/upload" className="btn btn--primary btn--sm"><PlusIcon aria-hidden="true" /> Upload</Link>
+            <Link to="/settings" className="btn btn--ghost btn--icon btn--sm" aria-label="Settings"><Cog6ToothIcon aria-hidden="true" /></Link>
+          </div>
+        </header>
+
+        <main id="main" className="flex-1">
+          <Outlet />
+        </main>
+
+        <nav className="bottom-nav" aria-label="Main">
+          {NAV.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} aria-current={isActive(to) ? 'page' : undefined}>
+              <Icon aria-hidden="true" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
     </div>
   )
 }

@@ -1,102 +1,101 @@
 """
 Application Configuration
-Loads settings from environment variables with validation
+Loads settings from environment variables (and an optional .env file).
 """
 
+import secrets
 from functools import lru_cache
-from typing import List, Optional
-from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pathlib import Path
+from typing import List
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_SECRET = "change-me"
+
+
+def _persistent_dev_secret() -> str:
+    """Return a random signing key kept in backend/.secret_key.
+
+    Used when SECRET_KEY is not configured so that local sessions survive
+    server restarts without shipping a hard-coded key.
+    """
+    path = BACKEND_DIR / ".secret_key"
+    try:
+        if path.exists():
+            value = path.read_text(encoding="utf-8").strip()
+            if len(value) >= 32:
+                return value
+        value = secrets.token_urlsafe(48)
+        path.write_text(value, encoding="utf-8")
+        return value
+    except OSError:
+        return secrets.token_urlsafe(48)
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
-    
+
+    model_config = SettingsConfigDict(
+        env_file=(str(BACKEND_DIR.parent / ".env"), str(BACKEND_DIR / ".env")),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
     # Application
     app_name: str = "Quizzr"
     environment: str = "development"
-    debug: bool = True
-    
-    # Database (SQLite for local dev, PostgreSQL for production)
-    database_url: str = "sqlite+aiosqlite:///./quizzr.db"
-    
-    # Redis (optional for local dev)
-    redis_url: str = "redis://localhost:6379/0"
-    
-    # Security
-    secret_key: str = "your-super-secret-key-change-in-production-min-32-chars"
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
-    refresh_token_expire_days: int = 7
-    
-    # OpenAI
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4-turbo-preview"
-    # Optional: use an OpenAI-compatible local server by setting a base URL.
-    # Example: http://localhost:8321/v1 (if your local server exposes /v1)
-    openai_base_url: str = ""
+    debug: bool = False
 
-    # Local/Pluggable LLM (recommended: Ollama)
-    # llm_provider: 'ollama' (default) or 'openai' (OpenAI or OpenAI-compatible)
-    llm_provider: str = "ollama"
-    # Example Ollama models: 'llama3.2:3b', 'llama3.1:8b', custom model name, etc.
-    llm_model: str = "llama3.2:3b"
-    ollama_base_url: str = "http://localhost:11434"
-    
-    # File Upload
+    # Database (SQLite for local use, PostgreSQL for production)
+    database_url: str = f"sqlite+aiosqlite:///{(BACKEND_DIR / 'quizzr.db').as_posix()}"
+
+    # Security
+    secret_key: str = DEFAULT_SECRET
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
+    refresh_token_expire_days: int = 30
+
+    # File upload
     max_upload_size_mb: int = 50
-    upload_dir: str = "./uploads"
+    upload_dir: str = str(BACKEND_DIR / "uploads")
     allowed_extensions: str = "pdf"
-    
-    # Rate Limiting
-    rate_limit_requests: int = 100
-    rate_limit_window_seconds: int = 60
-    
-    # Generation Limits
+    storage_quota_mb: int = 500
+
+    # Generation limits
     max_cards_per_document: int = 500
     max_quiz_questions: int = 50
-    max_chunks_per_generation: int = 20
-    
+    max_chunks_per_generation: int = 40
+
     # Frontend URL (CORS)
-    frontend_url: str = "http://localhost:5173"
-    
-    # OCR Settings
-    ocr_enabled: bool = True
-    ocr_text_threshold: int = 50
-    
-    # Celery
-    celery_broker_url: str = "redis://localhost:6379/0"
-    celery_result_backend: str = "redis://localhost:6379/0"
-    
+    frontend_url: str = "http://localhost:3000"
+
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
-    
+
     @property
     def allowed_extensions_list(self) -> List[str]:
         return [ext.strip().lower() for ext in self.allowed_extensions.split(",")]
-    
+
     @property
     def cors_origins(self) -> List[str]:
-        origins = [self.frontend_url]
+        origins = {self.frontend_url}
         if self.environment == "development":
-            origins.extend([
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:3000",
-            ])
-        return origins
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+            for port in (3000, 4173, 5173):
+                origins.add(f"http://localhost:{port}")
+                origins.add(f"http://127.0.0.1:{port}")
+        return sorted(origins)
 
 
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance"""
-    return Settings()
+    s = Settings()
+    if not s.secret_key or s.secret_key in {DEFAULT_SECRET, "your-super-secret-key-change-in-production-min-32-chars"}:
+        s.secret_key = _persistent_dev_secret()
+    return s
 
 
 settings = get_settings()

@@ -5,11 +5,17 @@ Quizzes, questions, attempts, and answers
 
 import enum
 from datetime import datetime
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import String, DateTime, Integer, ForeignKey, Text, Boolean, Enum, JSON, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:  # pragma: no cover
+    from app.models.course import Course
+    from app.models.document import Document
+    from app.models.tag import QuestionTag
+    from app.models.user import User
 
 
 class QuestionType(str, enum.Enum):

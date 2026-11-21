@@ -1,489 +1,227 @@
-import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
-import {
-  UserIcon,
-  KeyIcon,
-  BellIcon,
-  PaintBrushIcon,
-  TrashIcon,
-  ArrowRightOnRectangleIcon,
-} from '@heroicons/react/24/outline'
-import { useAuthStore } from '../stores/authStore'
-import { authApi } from '../lib/api'
-import clsx from 'clsx'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { ComputerDesktopIcon, MoonIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
+import { authApi, errorMessage } from '../lib/api'
+import { getCardsPerSession, getThemeMode, setCardsPerSession, setThemeMode, type ThemeMode } from '../lib/theme'
+import { useAuthStore } from '../stores/authStore'
+import { Button, ConfirmDialog, Field, PageHeader, Segmented } from '../components/ui'
+import { initials } from '../lib/format'
+import { Item, Page, Stagger } from '../components/motion'
 
-type Tab = 'profile' | 'security' | 'preferences' | 'notifications'
+function Panel({ id, title, sub, children }: { id?: string; title: string; sub?: string; children: ReactNode }) {
+  return (
+    <Item className="card card--pad">
+      <section id={id} aria-labelledby={`${id ?? title}-h`}>
+        <h2 id={`${id ?? title}-h`} style={{ fontSize: 'var(--text-lg)' }}>{title}</h2>
+        {sub && <p className="small muted" style={{ marginTop: 4 }}>{sub}</p>}
+        <div style={{ marginTop: 18 }}>{children}</div>
+      </section>
+    </Item>
+  )
+}
 
 export default function Settings() {
-  const { user, logout, updateUser } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<Tab>('profile')
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const { user, updateUser, login, logout } = useAuthStore()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const queryClient = useQueryClient()
 
-  // Profile form
-  const [name, setName] = useState(user?.name || '')
-  const [email, setEmail] = useState(user?.email || '')
-
-  // Password form
+  const [name, setName] = useState(user?.name ?? '')
+  const [email, setEmail] = useState(user?.email ?? '')
+  const [school, setSchool] = useState(user?.school ?? '')
+  const [savingProfile, setSavingProfile] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [convertName, setConvertName] = useState('')
+  const [convertEmail, setConvertEmail] = useState('')
+  const [convertPassword, setConvertPassword] = useState('')
+  const [converting, setConverting] = useState(false)
+  const [theme, setTheme] = useState<ThemeMode>(getThemeMode())
+  const [perSession, setPerSession] = useState(String(getCardsPerSession()))
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
-  // Preferences
-  const [theme, setTheme] = useState<string>(() => {
-    return localStorage.getItem('quizzr-theme') || 'light'
-  })
-  const [cardsPerSession, setCardsPerSession] = useState(20)
-  const [showAnswerImmediately, setShowAnswerImmediately] = useState(false)
-  const [autoPlayAudio, setAutoPlayAudio] = useState(true)
+  useEffect(() => {
+    if (location.hash) setTimeout(() => document.querySelector(location.hash)?.scrollIntoView({ behavior: 'smooth' }), 300)
+  }, [location.hash])
 
-  // Notifications
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [studyReminders, setStudyReminders] = useState(true)
-  const [weeklyReport, setWeeklyReport] = useState(true)
+  const saveProfile = async (e: FormEvent) => {
+    e.preventDefault()
+    setSavingProfile(true)
+    try {
+      const updated = await authApi.updateMe({ name: name.trim(), email: email.trim(), school: school.trim() || null })
+      updateUser(updated)
+      toast.success('Profile saved')
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setSavingProfile(false)
+    }
+  }
 
-  const profileMutation = useMutation({
-    mutationFn: (data: { name: string; email: string }) => authApi.updateMe(data),
-    onSuccess: (updatedUser) => {
-      updateUser(updatedUser)
-      toast.success('Profile updated')
-    },
-  })
-
-  const passwordMutation = useMutation({
-    mutationFn: (data: { currentPassword: string; newPassword: string }) =>
-      authApi.changePassword(data.currentPassword, data.newPassword),
-    onSuccess: () => {
+  const savePassword = async (e: FormEvent) => {
+    e.preventDefault()
+    setPasswordError(null)
+    if (newPassword.length < 8) { setPasswordError('Use at least 8 characters.'); return }
+    setSavingPassword(true)
+    try {
+      await authApi.changePassword(currentPassword, newPassword)
       setCurrentPassword('')
       setNewPassword('')
-      setConfirmPassword('')
-      toast.success('Password changed successfully')
-    },
-  })
+      toast.success('Password changed')
+    } catch (err) {
+      setPasswordError(errorMessage(err))
+    } finally {
+      setSavingPassword(false)
+    }
+  }
 
-  const tabs = [
-    { id: 'profile', name: 'Profile', icon: UserIcon },
-    { id: 'security', name: 'Security', icon: KeyIcon },
-    { id: 'preferences', name: 'Preferences', icon: PaintBrushIcon },
-    { id: 'notifications', name: 'Notifications', icon: BellIcon },
-  ]
-
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  const convert = async (e: FormEvent) => {
     e.preventDefault()
-    profileMutation.mutate({ name, email })
-  }
-
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match')
-      return
-    }
-
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters')
-      return
-    }
-
-    const hasUpper = /[A-Z]/.test(newPassword)
-    const hasLower = /[a-z]/.test(newPassword)
-    const hasDigit = /\d/.test(newPassword)
-    if (!hasUpper || !hasLower || !hasDigit) {
-      toast.error('Password must include uppercase, lowercase, and a number')
-      return
-    }
-
-    passwordMutation.mutate({ currentPassword, newPassword })
-  }
-
-  const applyTheme = (nextTheme: string) => {
-    setTheme(nextTheme)
-    localStorage.setItem('quizzr-theme', nextTheme)
-
-    const root = document.documentElement
-    root.classList.remove('dark')
-
-    if (nextTheme === 'dark') {
-      root.classList.add('dark')
-    } else if (nextTheme === 'system') {
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark')
-      }
+    if (convertPassword.length < 8) { toast.error('Use a password of at least 8 characters.'); return }
+    setConverting(true)
+    try {
+      const data = await authApi.convertGuest(convertEmail.trim(), convertPassword, convertName.trim())
+      login(data.user, data.access_token, data.refresh_token)
+      setName(data.user.name)
+      setEmail(data.user.email)
+      toast.success('Account saved')
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setConverting(false)
     }
   }
+
+  const deleteAccount = async () => {
+    setDeleting(true)
+    try {
+      await authApi.deleteAccount()
+      logout()
+      queryClient.clear()
+      navigate('/')
+      toast.success('Account deleted')
+    } catch (err) {
+      toast.error(errorMessage(err))
+      setDeleting(false)
+    }
+  }
+
+  if (!user) return null
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-8">Settings</h1>
+    <Page className="page page--narrow">
+      <PageHeader title="Settings" />
 
-      <div className="flex gap-8">
-        {/* Sidebar */}
-        <div className="w-48 shrink-0">
-          <nav className="space-y-1">
-            {tabs.map((tab) => (
+      <Stagger className="grid gap-4">
+        <Item className="card card--pad flex items-center gap-4">
+          <span className="avatar" style={{ width: 56, height: 56, fontSize: '1.2rem' }}>{user.is_guest ? 'G' : initials(user.name)}</span>
+          <div className="min-w-0">
+            <div className="row-title" style={{ fontSize: '1.1rem' }}>{user.is_guest ? 'Guest account' : user.name}</div>
+            <div className="small muted truncate">{user.is_guest ? 'Your work isn’t saved to an account yet' : user.email}</div>
+          </div>
+        </Item>
+
+        {user.is_guest ? (
+          <Panel id="account" title="Keep your work" sub="Add an email and password to keep your documents, decks and history.">
+            <form onSubmit={convert} className="grid gap-4">
+              <Field label="Name" htmlFor="cv-name"><input id="cv-name" className="input" autoComplete="name" value={convertName} onChange={(e) => setConvertName(e.target.value)} required /></Field>
+              <Field label="Email" htmlFor="cv-email"><input id="cv-email" type="email" inputMode="email" autoComplete="email" className="input" value={convertEmail} onChange={(e) => setConvertEmail(e.target.value)} required /></Field>
+              <Field label="Password" htmlFor="cv-password" help="At least 8 characters."><input id="cv-password" type="password" autoComplete="new-password" className="input" value={convertPassword} onChange={(e) => setConvertPassword(e.target.value)} required /></Field>
+              <div><Button type="submit" variant="primary" loading={converting} disabled={!convertName.trim() || !convertEmail.trim() || !convertPassword}>Save my account</Button></div>
+            </form>
+          </Panel>
+        ) : (
+          <Panel title="Profile">
+            <form onSubmit={saveProfile} className="grid gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Name" htmlFor="name"><input id="name" className="input" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required /></Field>
+                <Field label="Email" htmlFor="email"><input id="email" type="email" inputMode="email" autoComplete="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
+              </div>
+              <Field label="School or course (optional)" htmlFor="school"><input id="school" className="input" autoComplete="organization" value={school} onChange={(e) => setSchool(e.target.value)} /></Field>
+              <div><Button type="submit" variant="primary" loading={savingProfile} disabled={!name.trim() || !email.trim()}>Save changes</Button></div>
+            </form>
+          </Panel>
+        )}
+
+        <Panel title="Appearance">
+          <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Colour mode">
+            {([
+              ['system', 'Automatic', ComputerDesktopIcon],
+              ['light', 'Light', SunIcon],
+              ['dark', 'Dark', MoonIcon],
+            ] as const).map(([value, label, Icon]) => (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as Tab)}
-                className={clsx(
-                  'w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                  activeTab === tab.id
-                    ? 'bg-primary-900/50 text-primary-400'
-                    : 'text-gray-400 hover:bg-gray-800'
-                )}
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={theme === value}
+                className="check"
+                style={{ flexDirection: 'column', justifyContent: 'center', minHeight: 84, gap: 6, border: 0 }}
+                onClick={() => { setTheme(value); setThemeMode(value) }}
               >
-                <tab.icon className="w-5 h-5" />
-                {tab.name}
+                <Icon style={{ width: 24, height: 24, color: theme === value ? 'var(--color-accent-text)' : 'var(--color-muted)' }} aria-hidden="true" />
+                <span className="small" style={{ fontWeight: 500 }}>{label}</span>
               </button>
             ))}
-          </nav>
-
-          <div className="mt-8 pt-8 border-t border-gray-700">
-            <button
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-400 hover:bg-gray-800 rounded-lg"
-            >
-              <ArrowRightOnRectangleIcon className="w-5 h-5" />
-              Sign Out
-            </button>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-900/30 rounded-lg"
-            >
-              <TrashIcon className="w-5 h-5" />
-              Delete Account
-            </button>
           </div>
-        </div>
+        </Panel>
 
-        {/* Content */}
-        <div className="flex-1">
-          {activeTab === 'profile' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card bg-gray-800 border-gray-700 p-6"
-            >
-              <h2 className="text-lg font-semibold text-white mb-6">
-                Profile Settings
-              </h2>
-              <form onSubmit={handleProfileSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="input bg-gray-700 border-gray-600 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="input bg-gray-700 border-gray-600 text-white"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={profileMutation.isPending}
-                  className="btn-primary"
-                >
-                  {profileMutation.isPending ? 'Saving...' : 'Save Changes'}
-                </button>
-                {profileMutation.isSuccess && (
-                  <p className="text-sm text-green-400">
-                    Profile updated successfully!
-                  </p>
-                )}
-              </form>
-            </motion.div>
-          )}
-
-          {activeTab === 'security' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card bg-gray-800 border-gray-700 p-6"
-            >
-              <h2 className="text-lg font-semibold text-white mb-6">
-                Change Password
-              </h2>
-              <form onSubmit={handlePasswordSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Current Password
-                  </label>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="input bg-gray-700 border-gray-600 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="input bg-gray-700 border-gray-600 text-white"
-                    required
-                    minLength={8}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Confirm New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="input bg-gray-700 border-gray-600 text-white"
-                    required
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={passwordMutation.isPending}
-                  className="btn-primary"
-                >
-                  {passwordMutation.isPending
-                    ? 'Changing...'
-                    : 'Change Password'}
-                </button>
-                {passwordMutation.isError && (
-                  <p className="text-sm text-red-400">
-                    Failed to change password. Please check your current
-                    password.
-                  </p>
-                )}
-              </form>
-            </motion.div>
-          )}
-
-          {activeTab === 'preferences' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card bg-gray-800 border-gray-700 p-6"
-            >
-              <h2 className="text-lg font-semibold text-white mb-6">
-                Study Preferences
-              </h2>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Theme
-                  </label>
-                  <select
-                    value={theme}
-                    onChange={(e) => applyTheme(e.target.value)}
-                    className="input bg-gray-700 border-gray-600 text-white"
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="system">System</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Cards Per Study Session
-                  </label>
-                  <input
-                    type="number"
-                    value={cardsPerSession}
-                    onChange={(e) => setCardsPerSession(parseInt(e.target.value))}
-                    className="input bg-gray-700 border-gray-600 text-white"
-                    min={5}
-                    max={100}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">
-                      Show Answer Immediately
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Skip the card flip animation
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAnswerImmediately(!showAnswerImmediately)}
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                      showAnswerImmediately ? 'bg-primary-600' : 'bg-gray-600'
-                    )}
-                  >
-                    <span
-                      className={clsx(
-                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                        showAnswerImmediately ? 'translate-x-6' : 'translate-x-1'
-                      )}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Auto-play Audio</p>
-                    <p className="text-sm text-gray-400">
-                      Automatically play card audio if available
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setAutoPlayAudio(!autoPlayAudio)}
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                      autoPlayAudio ? 'bg-primary-600' : 'bg-gray-600'
-                    )}
-                  >
-                    <span
-                      className={clsx(
-                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                        autoPlayAudio ? 'translate-x-6' : 'translate-x-1'
-                      )}
-                    />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'notifications' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card bg-gray-800 border-gray-700 p-6"
-            >
-              <h2 className="text-lg font-semibold text-white mb-6">
-                Notification Settings
-              </h2>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">
-                      Email Notifications
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Receive important updates via email
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEmailNotifications(!emailNotifications)}
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                      emailNotifications ? 'bg-primary-600' : 'bg-gray-600'
-                    )}
-                  >
-                    <span
-                      className={clsx(
-                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                        emailNotifications ? 'translate-x-6' : 'translate-x-1'
-                      )}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Study Reminders</p>
-                    <p className="text-sm text-gray-400">
-                      Daily reminders to maintain your streak
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setStudyReminders(!studyReminders)}
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                      studyReminders ? 'bg-primary-600' : 'bg-gray-600'
-                    )}
-                  >
-                    <span
-                      className={clsx(
-                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                        studyReminders ? 'translate-x-6' : 'translate-x-1'
-                      )}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Weekly Report</p>
-                    <p className="text-sm text-gray-400">
-                      Get a summary of your weekly progress
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setWeeklyReport(!weeklyReport)}
-                    className={clsx(
-                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                      weeklyReport ? 'bg-primary-600' : 'bg-gray-600'
-                    )}
-                  >
-                    <span
-                      className={clsx(
-                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                        weeklyReport ? 'translate-x-6' : 'translate-x-1'
-                      )}
-                    />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </div>
-
-      {/* Delete Account Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4"
-          >
-            <h3 className="text-lg font-semibold text-white mb-2">
-              Delete Account
-            </h3>
-            <p className="text-gray-400 mb-6">
-              Are you sure you want to delete your account? This action cannot
-              be undone. All your data, including documents, decks, and study
-              progress will be permanently deleted.
-            </p>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="btn-secondary bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 flex-1"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  toast.error('Delete account is not available yet')
-                  setShowDeleteModal(false)
-                }}
-                className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Delete Account
-              </button>
+        <Panel title="Studying">
+          <div className="grid gap-5">
+            <div className="field">
+              <span className="label">Cards per session</span>
+              <Segmented<string>
+                label="Cards per session"
+                value={perSession}
+                onChange={(v) => { setPerSession(v); setCardsPerSession(Number(v)) }}
+                options={['10', '20', '30', '50'].map((n) => ({ value: n, label: n }))}
+              />
+              <p className="help">Cards that are due come first, then ones you haven’t studied.</p>
             </div>
-          </motion.div>
-        </div>
-      )}
-    </div>
+            <div className="notice notice--accent">
+              <SparklesIcon aria-hidden="true" />
+              <span>
+Cards and quizzes are written on this computer from your own notes. It works offline, with nothing to set up.
+              </span>
+            </div>
+          </div>
+        </Panel>
+
+        {!user.is_guest && (
+          <Panel title="Password">
+            <form onSubmit={savePassword} className="grid gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Current password" htmlFor="current-password">
+                  <input id="current-password" type="password" autoComplete="current-password" className="input" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+                </Field>
+                <Field label="New password" htmlFor="new-password" error={passwordError} help="At least 8 characters.">
+                  <input id="new-password" type="password" autoComplete="new-password" className="input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} aria-invalid={!!passwordError} required />
+                </Field>
+              </div>
+              <div><Button type="submit" loading={savingPassword} disabled={!currentPassword || !newPassword}>Change password</Button></div>
+            </form>
+          </Panel>
+        )}
+
+        <Panel title="Delete account" sub="Removes your documents, decks, quizzes and study history. This can’t be undone.">
+          <Button variant="danger" onClick={() => setConfirmDelete(true)}>Delete my account</Button>
+        </Panel>
+      </Stagger>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete your account?"
+        body="Everything you’ve uploaded and studied will be permanently deleted."
+        confirmLabel="Delete everything"
+        loading={deleting}
+        onConfirm={deleteAccount}
+        onClose={() => setConfirmDelete(false)}
+      />
+    </Page>
   )
 }

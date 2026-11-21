@@ -1,331 +1,197 @@
-import { useState, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useDropzone } from 'react-dropzone'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useDropzone, type FileRejection } from 'react-dropzone'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  DocumentArrowUpIcon,
-  DocumentIcon,
-  XMarkIcon,
-  CheckCircleIcon,
-  ExclamationCircleIcon,
-  ArrowPathIcon,
-  SparklesIcon,
+  ArrowUpTrayIcon, CheckCircleIcon, DocumentTextIcon, ExclamationCircleIcon, QuestionMarkCircleIcon, RectangleStackIcon, XMarkIcon,
 } from '@heroicons/react/24/outline'
-import { documentsApi, generationApi } from '../lib/api'
-import type { Document, GenerationJob } from '../types'
-import toast from 'react-hot-toast'
-import clsx from 'clsx'
+import { documentsApi, errorMessage } from '../lib/api'
+import { fileSize } from '../lib/format'
+import { Button, PageHeader } from '../components/ui'
+import { EASE_OUT, Page, ProgressBar } from '../components/motion'
+import type { Document } from '../types'
+
+const MAX_MB = 50
 
 export default function Upload() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [uploadedDoc, setUploadedDoc] = useState<Document | null>(null)
-  const [generationJob, setGenerationJob] = useState<GenerationJob | null>(null)
-  const [generationType, setGenerationType] = useState<'deck' | 'quiz' | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [uploaded, setUploaded] = useState<Document | null>(null)
 
-  // Upload mutation
-  const uploadMutation = useMutation({
-    mutationFn: (file: File) => documentsApi.upload(file),
-    onSuccess: (doc) => {
-      setUploadedDoc(doc)
-      toast.success('Document uploaded successfully!')
-      queryClient.invalidateQueries({ queryKey: ['documents'] })
-    },
-    onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Upload failed')
+  const doc = useQuery({
+    queryKey: ['documents', uploaded?.id],
+    queryFn: () => documentsApi.get(uploaded!.id),
+    enabled: !!uploaded,
+    refetchInterval: (q) => {
+      const status = q.state.data?.status
+      return status === 'processed' || status === 'error' ? false : 1000
     },
   })
 
-  // Generation mutation
-  const generateDeckMutation = useMutation({
-    mutationFn: (documentId: number) =>
-      generationApi.generateDeck({ document_id: documentId, card_count: 10 }),
-    onSuccess: (job) => {
-      setGenerationJob(job)
-      setGenerationType('deck')
-      toast.success('Deck generation started!')
-    },
-    onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Generation failed')
-    },
-  })
-
-  const generateQuizMutation = useMutation({
-    mutationFn: (documentId: number) =>
-      generationApi.generateQuiz({ document_id: documentId, question_count: 10 }),
-    onSuccess: (job) => {
-      setGenerationJob(job)
-      setGenerationType('quiz')
-      toast.success('Quiz generation started!')
-    },
-    onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Generation failed')
-    },
-  })
-
-  // Poll for job status
-  const { data: jobStatus } = useQuery({
-    queryKey: ['generation-job', generationJob?.job_id],
-    queryFn: () => generationApi.getJobStatus(generationJob!.job_id),
-    enabled: !!generationJob,
-    refetchInterval: (query) => {
-      const status = (query.state.data as GenerationJob | undefined)?.status ?? generationJob?.status
-      return status && ['completed', 'failed'].includes(status) ? false : 2000
-    },
-  })
-
-  // Poll for document processing status
-  const { data: docStatus } = useQuery({
-    queryKey: ['document', uploadedDoc?.id],
-    queryFn: () => documentsApi.get(uploadedDoc!.id),
-    enabled: !!uploadedDoc,
-    refetchInterval: (query) => {
-      const status = (query.state.data as Document | undefined)?.status ?? uploadedDoc?.status
-      return status && ['processed', 'error'].includes(status) ? false : 2000
-    },
-  })
-
-  const currentDoc = docStatus || uploadedDoc
-  const currentJob = jobStatus || generationJob
-
-  useEffect(() => {
-    if (currentJob?.status !== 'completed' || !currentJob.result_id) return
-    const resultPath = generationType === 'deck'
-      ? `/decks/${currentJob.result_id}`
-      : `/quizzes/${currentJob.result_id}`
-    const t = window.setTimeout(() => navigate(resultPath), 800)
-    return () => window.clearTimeout(t)
-  }, [currentJob?.status, currentJob?.result_id, generationType, navigate])
-
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0]
-    if (file) {
-      uploadMutation.mutate(file)
+  const onDrop = useCallback((accepted: File[], rejected: FileRejection[]) => {
+    setError(null)
+    if (rejected.length) {
+      const code = rejected[0].errors[0]?.code
+      setError(code === 'file-too-large' ? `That file is over ${MAX_MB} MB.` : 'Only PDF files can be uploaded.')
+      return
     }
-  }, [uploadMutation])
+    if (accepted[0]) setFile(accepted[0])
+  }, [])
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-    },
-    maxSize: 50 * 1024 * 1024, // 50MB
-    maxFiles: 1,
+    accept: { 'application/pdf': ['.pdf'] },
+    maxSize: MAX_MB * 1024 * 1024,
+    multiple: false,
+    noClick: true,
+    disabled: uploading,
   })
 
-  const resetUpload = () => {
-    setUploadedDoc(null)
-    setGenerationJob(null)
-    setGenerationType(null)
+  const upload = async () => {
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    setProgress(0)
+    try {
+      const result = await documentsApi.upload(file, setProgress)
+      setUploaded(result)
+      queryClient.invalidateQueries({ queryKey: ['documents'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics'] })
+    } catch (err) {
+      setError(errorMessage(err, 'The upload failed.'))
+    } finally {
+      setUploading(false)
+    }
   }
 
+  const reset = () => {
+    setFile(null)
+    setUploaded(null)
+    setProgress(0)
+    setError(null)
+  }
+
+  const current = doc.data ?? uploaded
+  const status = current?.status
+  const stage = !uploaded ? 'pick' : status === 'processed' ? 'done' : status === 'error' ? 'error' : 'reading'
+
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-white">Upload Document</h1>
-        <p className="mt-2 text-gray-400">
-          Upload a PDF and let AI generate flashcards and quizzes for you
-        </p>
-      </div>
+    <Page className="page page--narrow">
+      <PageHeader title="Upload a PDF" sub="Lecture notes, slides or a textbook chapter. PDFs need selectable text." />
 
-      {!uploadedDoc ? (
-        // Upload dropzone
-        <div
-          {...getRootProps()}
-          className={clsx(
-            'card bg-gray-800 border-gray-700 p-12 border-2 border-dashed cursor-pointer transition-all',
-            isDragActive
-              ? 'border-primary-500 bg-gray-700'
-              : 'border-gray-600 hover:border-primary-400 hover:bg-gray-700',
-            uploadMutation.isPending && 'opacity-50 cursor-not-allowed'
-          )}
-        >
-          <input {...getInputProps()} disabled={uploadMutation.isPending} />
-          <div className="text-center">
-            {uploadMutation.isPending ? (
-              <>
-                <ArrowPathIcon className="w-16 h-16 mx-auto text-primary-500 animate-spin" />
-                <p className="mt-4 text-lg font-medium text-white">
-                  Uploading...
-                </p>
-              </>
-            ) : (
-              <>
-                <DocumentArrowUpIcon className="w-16 h-16 mx-auto text-gray-500" />
-                <p className="mt-4 text-lg font-medium text-white">
-                  {isDragActive ? 'Drop your PDF here' : 'Drag & drop your PDF here'}
-                </p>
-                <p className="mt-2 text-sm text-gray-400">
-                  or click to browse (max 50MB)
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      ) : (
-        // Document uploaded - show status and options
-        <div className="space-y-6">
-          {/* Document status card */}
-          <div className="card bg-gray-800 border-gray-700 p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center">
-                <DocumentIcon className="w-12 h-12 text-primary-400" />
-                <div className="ml-4">
-                  <h3 className="font-medium text-white">
-                    {currentDoc?.title || currentDoc?.filename}
-                  </h3>
-                  <p className="text-sm text-gray-400">
-                    {currentDoc?.page_count} pages • {((currentDoc?.file_size || 0) / 1024).toFixed(0)} KB
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={resetUpload}
-                className="p-2 text-gray-500 hover:text-gray-400"
+      <AnimatePresence mode="wait">
+        {stage === 'pick' && (
+          <motion.div key="pick" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: EASE_OUT }}>
+            {!file ? (
+              <div
+                {...getRootProps({
+                  className: 'dropzone',
+                  'data-active': isDragActive,
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-label': 'Choose a PDF to upload',
+                  onClick: open,
+                  onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } },
+                })}
               >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Processing status */}
-            <div className="mt-4 flex items-center">
-              {currentDoc?.status === 'pending' || currentDoc?.status === 'processing' ? (
-                <>
-                  <ArrowPathIcon className="w-5 h-5 text-primary-500 animate-spin mr-2" />
-                  <span className="text-sm text-gray-300">Processing document...</span>
-                </>
-              ) : currentDoc?.status === 'processed' ? (
-                <>
-                  <CheckCircleIcon className="w-5 h-5 text-green-500 mr-2" />
-                  <span className="text-sm text-green-400">Document processed successfully</span>
-                </>
-              ) : (
-                <>
-                  <ExclamationCircleIcon className="w-5 h-5 text-red-500 mr-2" />
-                  <span className="text-sm text-red-400">
-                    {currentDoc?.error_message || 'Processing failed'}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Generation options */}
-          {currentDoc?.status === 'processed' && !generationJob && (
-            <div className="grid md:grid-cols-2 gap-4">
-              <button
-                onClick={() => generateDeckMutation.mutate(currentDoc.id)}
-                disabled={generateDeckMutation.isPending || generateQuizMutation.isPending}
-                className="card bg-gray-800 border-gray-700 p-6 text-left hover:border-primary-500 hover:bg-gray-700 transition-all disabled:opacity-50"
-              >
-                <div className="flex items-center mb-4">
-                  <div className="p-3 bg-purple-900/50 rounded-lg">
-                    <SparklesIcon className="w-6 h-6 text-purple-400" />
-                  </div>
-                  <h3 className="ml-3 text-lg font-semibold text-white">
-                    Generate Flashcards
-                  </h3>
-                </div>
-                <p className="text-sm text-gray-400">
-                  Create a deck of flashcards from key concepts in your document.
-                  Perfect for spaced repetition study.
-                </p>
-              </button>
-
-              <button
-                onClick={() => generateQuizMutation.mutate(currentDoc.id)}
-                disabled={generateDeckMutation.isPending || generateQuizMutation.isPending}
-                className="card bg-gray-800 border-gray-700 p-6 text-left hover:border-primary-500 hover:bg-gray-700 transition-all disabled:opacity-50"
-              >
-                <div className="flex items-center mb-4">
-                  <div className="p-3 bg-green-900/50 rounded-lg">
-                    <SparklesIcon className="w-6 h-6 text-green-400" />
-                  </div>
-                  <h3 className="ml-3 text-lg font-semibold text-white">
-                    Generate Quiz
-                  </h3>
-                </div>
-                <p className="text-sm text-gray-400">
-                  Create a quiz with multiple choice, true/false, and fill-in-the-blank
-                  questions.
-                </p>
-              </button>
-            </div>
-          )}
-
-          {/* Generation progress */}
-          {currentJob && currentJob.status !== 'completed' && currentJob.status !== 'failed' && (
-            <div className="card bg-gray-800 border-gray-700 p-6">
-              <div className="flex items-center mb-4">
-                <ArrowPathIcon className="w-6 h-6 text-primary-500 animate-spin mr-3" />
-                <h3 className="font-medium text-white">
-                  Generating {generationType === 'deck' ? 'Flashcards' : 'Quiz'}...
-                </h3>
-              </div>
-              <div className="w-full bg-gray-600 rounded-full h-2">
-                <div
-                  className="bg-primary-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${currentJob.progress ?? 10}%` }}
-                />
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <p className="text-sm text-gray-400">
-                  Status: <span className="font-medium">{currentJob.status}</span>
-                  {typeof currentJob.progress === 'number' ? ` • ${currentJob.progress}%` : ''}
-                  {currentJob.job_id ? ` • Job #${currentJob.job_id}` : ''}
-                </p>
-              </div>
-              <p className="mt-1 text-sm text-gray-400">
-                {currentJob.message ||
-                  "This can take a couple minutes depending on document size and generation."}
-              </p>
-            </div>
-          )}
-
-          {/* Generation complete */}
-          {currentJob?.status === 'completed' && (
-            <div className="card p-6 bg-green-900/30 border-green-700">
-              <div className="flex items-center">
-                <CheckCircleIcon className="w-6 h-6 text-green-400 mr-3" />
+                <input {...getInputProps({ name: 'file' })} />
+                <motion.div className="dropzone__icon" animate={isDragActive ? { scale: 1.12, rotate: -6 } : { scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 18 }}>
+                  <ArrowUpTrayIcon aria-hidden="true" />
+                </motion.div>
                 <div>
-                  <h3 className="font-medium text-green-300">
-                    {generationType === 'deck' ? 'Flashcards' : 'Quiz'} Generated!
-                  </h3>
-                  <p className="text-sm text-green-400">
-                    Redirecting you to your new content...
-                  </p>
+                  <h2 style={{ fontSize: 'var(--text-xl)' }}>{isDragActive ? 'Drop it here' : 'Drag your PDF here'}</h2>
+                  <p className="muted" style={{ marginTop: 6 }}>or click to choose a file, up to {MAX_MB} MB</p>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Generation failed */}
-          {currentJob?.status === 'failed' && (
-            <div className="card p-6 bg-red-900/30 border-red-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <ExclamationCircleIcon className="w-6 h-6 text-red-400 mr-3" />
-                  <div>
-                    <h3 className="font-medium text-red-300">Generation Failed</h3>
-                    <p className="text-sm text-red-400">
-                      {currentJob.message || 'An error occurred during generation'}
-                    </p>
+            ) : (
+              <motion.div className="card card--pad" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: EASE_OUT }}>
+                <div className="flex items-center gap-4">
+                  <div className="icon-tile" style={{ width: 52, height: 52 }}><DocumentTextIcon aria-hidden="true" /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="row-title truncate">{file.name}</p>
+                    <p className="row-meta">{fileSize(file.size)}</p>
                   </div>
+                  {!uploading && <Button variant="ghost" size="sm" icon={<XMarkIcon />} aria-label="Remove file" onClick={reset} />}
                 </div>
-                <button
-                  onClick={() => setGenerationJob(null)}
-                  className="btn-secondary bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 text-sm"
-                >
-                  Try Again
-                </button>
+                {uploading && (
+                  <div style={{ marginTop: 20 }}>
+                    <ProgressBar value={progress} label="Upload progress" />
+                    <p className="small muted" style={{ marginTop: 8 }}>Uploading… {progress}%</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2" style={{ marginTop: 20 }}>
+                  <Button variant="primary" size="lg" onClick={upload} loading={uploading}>Upload and read</Button>
+                  {!uploading && <Button size="lg" onClick={open}>Choose another</Button>}
+                </div>
+                <input {...getInputProps({ name: 'file' })} />
+              </motion.div>
+            )}
+            {error && (
+              <motion.div className="notice notice--error" role="alert" style={{ marginTop: 16 }} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: [0, -6, 6, -3, 0] }} transition={{ duration: 0.4 }}>
+                <ExclamationCircleIcon aria-hidden="true" />{error}
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
+        {stage === 'reading' && (
+          <motion.div key="reading" className="card card--pad" aria-live="polite" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: EASE_OUT }}>
+            <div className="flex items-center gap-4">
+              <motion.div className="icon-tile" style={{ width: 52, height: 52 }} animate={{ scale: [1, 1.06, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}>
+                <DocumentTextIcon aria-hidden="true" />
+              </motion.div>
+              <div className="min-w-0">
+                <h2 style={{ fontSize: 'var(--text-xl)' }}>Reading your PDF…</h2>
+                <p className="muted">Pulling out the text and splitting it into study sections.</p>
               </div>
             </div>
-          )}
-        </div>
-      )}
-    </div>
+            <div style={{ marginTop: 20 }}><ProgressBar value={status === 'processing' ? 70 : 30} label="Processing progress" /></div>
+          </motion.div>
+        )}
+
+        {stage === 'done' && current && (
+          <motion.div key="done" className="card card--pad" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 26 }}>
+            <div className="flex items-center gap-4">
+              <motion.div initial={{ scale: 0, rotate: -45 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 15, delay: 0.1 }}>
+                <CheckCircleIcon aria-hidden="true" style={{ width: 52, height: 52, color: 'var(--color-success)' }} />
+              </motion.div>
+              <div className="min-w-0">
+                <h2 style={{ fontSize: 'var(--text-xl)' }}>Ready to study</h2>
+                <p className="muted truncate">{current.title || current.original_filename}, {current.page_count} {current.page_count === 1 ? 'page' : 'pages'}</p>
+              </div>
+            </div>
+            <p style={{ marginTop: 20 }} className="label">What would you like to make?</p>
+            <div className="grid gap-3 sm:grid-cols-2" style={{ marginTop: 10 }}>
+              <button type="button" className="card card-link text-left" style={{ padding: 20, border: 0, cursor: 'pointer' }} onClick={() => navigate(`/documents/${current.id}?make=deck`)}>
+                <div className="icon-tile"><RectangleStackIcon aria-hidden="true" /></div>
+                <h3 style={{ marginTop: 12 }}>Flashcards</h3>
+                <p className="row-meta">Definitions and fill-the-gap cards to review over time.</p>
+              </button>
+              <button type="button" className="card card-link text-left" style={{ padding: 20, border: 0, cursor: 'pointer' }} onClick={() => navigate(`/documents/${current.id}?make=quiz`)}>
+                <div className="icon-tile"><QuestionMarkCircleIcon aria-hidden="true" /></div>
+                <h3 style={{ marginTop: 12 }}>A quiz</h3>
+                <p className="row-meta">Multiple choice, true or false and short answers.</p>
+              </button>
+            </div>
+            <div style={{ marginTop: 16 }}><Button variant="ghost" onClick={reset}>Upload another PDF</Button></div>
+          </motion.div>
+        )}
+
+        {stage === 'error' && current && (
+          <motion.div key="error" className="card card--pad" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <div className="notice notice--error" role="alert"><ExclamationCircleIcon aria-hidden="true" />{current.error_message || 'This PDF couldn’t be read.'}</div>
+            <div className="flex flex-wrap gap-2" style={{ marginTop: 16 }}>
+              <Button variant="primary" onClick={reset}>Try another file</Button>
+              <Link to={`/documents/${current.id}`} className="btn">Open document</Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Page>
   )
 }

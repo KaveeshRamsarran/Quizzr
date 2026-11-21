@@ -3,30 +3,25 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
+import axios from 'axios'
+import { MotionConfig } from 'framer-motion'
 import App from './App'
+import { applyThemeMode, getThemeMode, watchSystemTheme } from './lib/theme'
 import './index.css'
 
-// Default to dark mode
-const savedTheme = localStorage.getItem('quizzr-theme') || 'dark'
-const root = document.documentElement
-root.classList.remove('dark', 'light')
-if (savedTheme === 'dark') {
-  root.classList.add('dark')
-} else if (savedTheme === 'system') {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    root.classList.add('dark')
-  }
-}
-// Set default theme in localStorage if not set
-if (!localStorage.getItem('quizzr-theme')) {
-  localStorage.setItem('quizzr-theme', 'dark')
-}
+applyThemeMode(getThemeMode())
+watchSystemTheme()
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      retry: (count, error) => {
+        const status = axios.isAxiosError(error) ? error.response?.status : undefined
+        if (status && status >= 400 && status < 500) return false
+        return count < 1
+      },
     },
   },
 })
@@ -34,31 +29,28 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <MotionConfig reducedMotion="user">
       <BrowserRouter>
         <App />
-        <Toaster 
-          position="top-right"
+        <Toaster
+          position="bottom-center"
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#333',
-              color: '#fff',
+              background: 'var(--color-ink)',
+              color: 'var(--color-paper)',
+              borderRadius: '14px',
+              padding: '10px 14px',
+              fontFamily: 'var(--font-body)',
+              fontSize: '0.95rem',
+              boxShadow: 'none',
             },
-            success: {
-              iconTheme: {
-                primary: '#22c55e',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
+            success: { iconTheme: { primary: 'var(--color-success)', secondary: 'var(--color-paper)' } },
+            error: { iconTheme: { primary: 'var(--color-error)', secondary: 'var(--color-paper)' } },
           }}
         />
       </BrowserRouter>
+      </MotionConfig>
     </QueryClientProvider>
   </React.StrictMode>,
 )

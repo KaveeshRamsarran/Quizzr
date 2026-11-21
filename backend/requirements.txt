@@ -1,61 +1,34 @@
-# FastAPI and ASGI
+# Quizzr backend dependencies
+# Works on Python 3.11 - 3.14. No Redis, Celery or local model server is required.
+
+# Web framework
 fastapi>=0.115.0,<1.0
-uvicorn[standard]>=0.34.0,<1.0
+uvicorn>=0.34.0,<1.0
 python-multipart>=0.0.20,<1.0
 
-# Database
-# SQLAlchemy async engine is used throughout the app
+# Database (SQLite by default, PostgreSQL when DATABASE_URL starts with postgresql://)
 sqlalchemy[asyncio]>=2.0.41,<3
-# Default local dev DB URL uses sqlite+aiosqlite
 aiosqlite>=0.21.0,<1
-# Postgres async driver used when DATABASE_URL starts with postgresql://.
-# asyncpg does not currently provide wheels for Python 3.14, so avoid
-# installing it there; Docker uses Python 3.11 and will install it.
-asyncpg==0.30.0; python_version < '3.14'
-alembic==1.13.1
+asyncpg>=0.30.0; python_version < '3.14'
 
 # Authentication
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-bcrypt==4.1.2
+PyJWT>=2.9.0,<3
+bcrypt>=4.2.0,<6
 
-# Redis and Celery
-redis==5.0.1
-celery==5.3.6
+# PDF text extraction
+pypdf>=5.0.0,<7
 
-# PDF Processing
-PyPDF2==3.0.1
-pdfplumber==0.10.3; python_version < '3.14'
-pdf2image==1.17.0; python_version < '3.14'
-pytesseract==0.3.10; python_version < '3.14'
-Pillow==10.2.0; python_version < '3.14'
-
-# AI/OpenAI
-openai>=1.107,<2
-tiktoken==0.5.2; python_version < '3.14'
-
-# Validation and Config
-# Keep compatible with FastAPI, but don't pin to versions that require
-# building pydantic-core from source on newer Python versions.
+# Validation and config
 pydantic>=2.12.0,<3
 pydantic-settings>=2.12.0,<3
-python-dotenv==1.0.0
-email-validator==2.1.0
+email-validator>=2.2.0,<3
 
 # Utilities
-python-dateutil==2.8.2
-httpx==0.26.0
-aiofiles==23.2.1
+httpx>=0.27.0,<1
+aiofiles>=24.1.0
+slowapi>=0.1.9
+structlog>=24.1.0
 
 # Testing
-pytest==7.4.4
-pytest-asyncio==0.23.3
-pytest-cov==4.1.0
-httpx==0.26.0
-factory-boy==3.3.0
-
-# Rate Limiting
-slowapi==0.1.9
-
-# Logging
-structlog==24.1.0
+pytest>=8.3.0
+pytest-asyncio>=0.24.0,<1

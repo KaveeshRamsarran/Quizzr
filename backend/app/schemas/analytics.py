@@ -61,6 +61,7 @@ class OverviewAnalytics(BaseModel):
     overall_accuracy: float
     cards_studied_today: int
     cards_due_today: int
+    reviews_due_today: int = 0
     quizzes_taken: int
     average_quiz_score: float
     
@@ -112,8 +113,8 @@ class QuestionAnalytics(BaseModel):
     times_incorrect: int
     times_correct: int
     accuracy: float
-    topic: Optional[str]
-    source_document: Optional[str]
+    topic: Optional[str] = None
+    source_document: Optional[str] = None
 
 
 class MissedQuestionsResponse(BaseModel):

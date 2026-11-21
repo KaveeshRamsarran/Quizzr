@@ -1,0 +1,125 @@
+%PDF-1.4
+%ту╧╙
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+3 0 obj
+<< /Length 640 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 56 806 Tm (CS 220 Data Structures, Week 9 slides) Tj
+/F2 20 Tf 1 0 0 1 56 768 Tm (Core Data Structures) Tj
+/F1 11 Tf 1 0 0 1 56 733 Tm (Big O notation describes how the running time of an algorithm grows as the input size grows.) Tj
+/F2 13.5 Tf 1 0 0 1 56 704.5 Tm (Arrays) Tj
+/F1 11 Tf 1 0 0 1 68 681.5 Tm (Х Array: a collection of elements stored in contiguous memory) Tj
+/F1 11 Tf 1 0 0 1 68 665.0 Tm (Х Access by index: O\(1\)) Tj
+/F1 11 Tf 1 0 0 1 68 648.5 Tm (Х Insertion in the middle: O\(n\)) Tj
+/F1 11 Tf 1 0 0 1 68 632.0 Tm (Х Fixed size in most languages) Tj
+/F1 8.5 Tf 1 0 0 1 280 30 Tm (Page 1 of 5) Tj
+ET
+endstream
+endobj
+4 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 595 842] /Contents 3 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
+endobj
+5 0 obj
+<< /Length 506 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 56 806 Tm (CS 220 Data Structures, Week 9 slides) Tj
+/F2 13.5 Tf 1 0 0 1 56 760 Tm (Linked Lists) Tj
+/F1 11 Tf 1 0 0 1 68 737 Tm (Х Linked list: a sequence of nodes where each node points to the next) Tj
+/F1 11 Tf 1 0 0 1 68 720.5 Tm (Х Insertion at the head: O\(1\)) Tj
+/F1 11 Tf 1 0 0 1 68 704.0 Tm (Х Search: O\(n\)) Tj
+/F1 11 Tf 1 0 0 1 68 687.5 Tm (Х Doubly linked list: each node points to both the next and the previous node) Tj
+/F1 8.5 Tf 1 0 0 1 280 30 Tm (Page 2 of 5) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 561 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 56 806 Tm (CS 220 Data Structures, Week 9 slides) Tj
+/F2 13.5 Tf 1 0 0 1 56 760 Tm (Stacks and Queues) Tj
+/F1 11 Tf 1 0 0 1 68 737 Tm (Х Stack: a last-in, first-out \(LIFO\) collection) Tj
+/F1 11 Tf 1 0 0 1 68 720.5 Tm (Х Queue: a first-in, first-out \(FIFO\) collection) Tj
+/F1 11 Tf 1 0 0 1 68 704.0 Tm (Х Push adds an item to the top of a stack; pop removes the top item) Tj
+/F1 11 Tf 1 0 0 1 68 687.5 Tm (Х Enqueue adds an item to the back of a queue; dequeue removes the front item) Tj
+/F1 8.5 Tf 1 0 0 1 280 30 Tm (Page 3 of 5) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 595 842] /Contents 7 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
+endobj
+9 0 obj
+<< /Length 588 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 56 806 Tm (CS 220 Data Structures, Week 9 slides) Tj
+/F2 13.5 Tf 1 0 0 1 56 760 Tm (Hash Tables) Tj
+/F1 11 Tf 1 0 0 1 68 737 Tm (Х Hash table: maps keys to values using a hash function) Tj
+/F1 11 Tf 1 0 0 1 68 720.5 Tm (Х Hash function: converts a key into an array index) Tj
+/F1 11 Tf 1 0 0 1 68 704.0 Tm (Х Collision: two keys map to the same index) Tj
+/F1 11 Tf 1 0 0 1 68 687.5 Tm (Х Chaining: stores colliding entries in a linked list at that index) Tj
+/F1 11 Tf 1 0 0 1 68 671.0 Tm (Х Average lookup: O\(1\)) Tj
+/F1 8.5 Tf 1 0 0 1 280 30 Tm (Page 4 of 5) Tj
+ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 595 842] /Contents 9 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
+endobj
+11 0 obj
+<< /Length 622 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 56 806 Tm (CS 220 Data Structures, Week 9 slides) Tj
+/F2 13.5 Tf 1 0 0 1 56 760 Tm (Trees) Tj
+/F1 11 Tf 1 0 0 1 68 737 Tm (Х Binary tree: a tree in which each node has at most two children) Tj
+/F1 11 Tf 1 0 0 1 68 720.5 Tm (Х Binary search tree \(BST\): left subtree holds smaller keys, right subtree holds larger) Tj
+/F1 11 Tf 1 0 0 1 80 705.0 Tm (keys) Tj
+/F1 11 Tf 1 0 0 1 68 688.5 Tm (Х Search in a balanced BST: O\(log n\)) Tj
+/F1 11 Tf 1 0 0 1 68 672.0 Tm (Х Heap: a complete binary tree where each parent is ordered relative to its children) Tj
+/F1 8.5 Tf 1 0 0 1 280 30 Tm (Page 5 of 5) Tj
+ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 13 0 R /MediaBox [0 0 595 842] /Contents 11 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
+endobj
+13 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R 10 0 R 12 0 R] /Count 5 >>
+endobj
+14 0 obj
+<< /Type /Catalog /Pages 13 0 R >>
+endobj
+xref
+0 15
+0000000000 65535 f 
+0000000015 00000 n 
+0000000112 00000 n 
+0000000214 00000 n 
+0000000905 00000 n 
+0000001042 00000 n 
+0000001599 00000 n 
+0000001736 00000 n 
+0000002348 00000 n 
+0000002485 00000 n 
+0000003124 00000 n 
+0000003262 00000 n 
+0000003936 00000 n 
+0000004075 00000 n 
+0000004159 00000 n 
+trailer
+<< /Size 15 /Root 14 0 R >>
+startxref
+4210
+%%EOF

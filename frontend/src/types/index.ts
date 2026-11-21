@@ -1,4 +1,5 @@
-// User types
+// Shapes returned by the Quizzr API (backend/app/schemas).
+
 export interface User {
   id: number
   email: string
@@ -9,19 +10,12 @@ export interface User {
   study_goal_days: number | null
   simple_mode: boolean
   role: 'standard' | 'admin' | 'guest'
+  is_guest: boolean
   is_verified: boolean
   study_streak: number
   total_study_time_minutes: number
   created_at: string
   last_login: string | null
-}
-
-export interface UserPreferences {
-  theme?: 'light' | 'dark' | 'system'
-  cards_per_session?: number
-  quiz_question_count?: number
-  show_hints?: boolean
-  daily_goal?: number
 }
 
 export interface TokenResponse {
@@ -32,7 +26,8 @@ export interface TokenResponse {
   user: User
 }
 
-// Document types
+export type DocumentStatus = 'pending' | 'processing' | 'processed' | 'error'
+
 export interface Document {
   id: number
   filename: string
@@ -41,139 +36,225 @@ export interface Document {
   description: string | null
   file_size: number
   mime_type: string
-  status: 'pending' | 'processing' | 'processed' | 'error'
-  page_count: number | null
+  status: DocumentStatus
+  style: string
+  page_count: number
+  processing_error: string | null
   error_message: string | null
+  ocr_used: boolean
   course_id: number | null
   created_at: string
   updated_at: string
+  processed_at: string | null
 }
 
-export interface DocumentListResponse {
-  documents: Document[]
+export interface DocumentPage {
+  id: number
+  page_number: number
+  text_content: string | null
+  text_length: number
+  used_ocr: boolean
+  headings_on_page: string[] | null
+}
+
+export interface Chunk {
+  id: number
+  chunk_index: number
+  start_page: number
+  end_page: number
+  content: string
+  content_length: number
+  heading_context: string | null
+  key_terms: string[] | null
+  content_type: string
+}
+
+export interface DocumentDetail extends Document {
+  pages: DocumentPage[]
+  chunks: Chunk[]
+}
+
+export interface Paginated {
   total: number
   page: number
   limit: number
   pages: number
 }
 
-// Deck types
+export interface DocumentListResponse extends Paginated {
+  documents: Document[]
+}
+
 export interface Deck {
   id: number
+  name: string
   title: string
   description: string | null
+  deck_type: string
   card_count: number
   mastered_count: number
+  due_count: number
+  new_count: number
+  source_document_id: number | null
   document_id: number | null
   course_id: number | null
   is_public: boolean
+  color: string
   created_at: string
   updated_at: string
+  last_studied: string | null
 }
 
 export interface Card {
   id: number
+  deck_id: number
+  card_type: string
   front: string
   back: string
-  card_type: 'basic' | 'cloze' | 'reverse' | 'image'
+  extra_explanation: string | null
+  example: string | null
+  mnemonic: string | null
+  cloze_text: string | null
+  cloze_answer: string | null
   difficulty: number
-  source_snippets: string[]
-  source_page: number | null
   needs_review: boolean
   review_reason: string | null
+  source_pages: number[] | null
+  source_snippets: string[] | null
+  times_studied: number
+  times_correct: number
+  times_incorrect: number
+  is_suspended: boolean
+  is_mastered: boolean
+  accuracy: number
   created_at: string
+  last_studied: string | null
 }
 
 export interface DeckDetail extends Deck {
   cards: Card[]
 }
 
-export interface DeckListResponse {
+export interface DeckListResponse extends Paginated {
   decks: Deck[]
-  total: number
-  page: number
-  limit: number
-  pages: number
 }
 
-// Quiz types
 export interface Quiz {
   id: number
+  name: string
   title: string
   description: string | null
+  difficulty: string
   question_count: number
   time_limit_minutes: number | null
   pass_percentage: number
+  shuffle_questions: boolean
+  shuffle_options: boolean
+  show_explanations: boolean
+  question_types: string[] | null
+  times_taken: number
   attempts_count: number
+  average_score: number | null
   best_score: number | null
+  source_document_id: number | null
   document_id: number | null
-  course_id: number | null
   created_at: string
   updated_at: string
 }
 
+export interface QuizOption {
+  id: string
+  text: string
+}
+
+export type QuestionType = 'mcq' | 'multi_select' | 'true_false' | 'short_answer' | 'fill_blank' | 'matching'
+
 export interface QuizQuestion {
   id: number
-  question_type: 'multiple_choice' | 'true_false' | 'fill_blank' | 'short_answer'
+  quiz_id: number
+  question_type: QuestionType
   question_text: string
-  options: string[] | null
-  correct_answer: string
+  options: QuizOption[] | null
+  correct_answer: string | null
   explanation: string | null
   difficulty: number
-  source_snippets: string[]
-  source_page: number | null
+  points: number
+  topic: string | null
+  question_order: number
+  source_pages: number[] | null
+  source_snippets: string[] | null
+  needs_review: boolean
 }
 
 export interface QuizDetail extends Quiz {
   questions: QuizQuestion[]
 }
 
-export interface QuizListResponse {
+export interface QuizListResponse extends Paginated {
   quizzes: Quiz[]
-  total: number
-  page: number
-  limit: number
-  pages: number
 }
 
 export interface QuizAttempt {
   id: number
   quiz_id: number
+  is_completed: boolean
   score: number | null
-  percentage: number | null
+  points_earned: number
+  points_possible: number
   correct_count: number
-  total_questions: number
+  incorrect_count: number
+  time_started: string
+  time_completed: string | null
   time_spent_seconds: number | null
-  started_at: string
-  completed_at: string | null
+}
+
+export interface AnswerResult {
+  is_correct: boolean
+  correct_answer: string | null
+  explanation: string | null
+}
+
+export interface QuestionReview {
+  question_id: number
+  question_text: string
+  question_type: QuestionType
+  options: QuizOption[] | null
+  correct_answer: string
+  user_answer: string | null
+  is_correct: boolean
+  explanation: string | null
+  topic: string | null
 }
 
 export interface AttemptResult {
   attempt_id: number
+  quiz_id: number
+  quiz_name: string
   score: number
   percentage: number
-  correct_count: number
-  total_questions: number
   passed: boolean
+  points_earned: number
+  points_possible: number
+  correct_count: number
+  incorrect_count: number
   time_spent_seconds: number
-  question_results: QuestionResult[]
+  by_topic: Record<string, { correct: number; total: number }>
+  by_type: Record<string, { correct: number; total: number }>
+  weak_topics: string[]
+  questions: QuestionReview[]
 }
 
-export interface QuestionResult {
-  question_id: number
-  is_correct: boolean
-  given_answer: string
-  correct_answer: string
-  explanation: string | null
-}
+export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
-// Generation types
 export interface GenerationJob {
   job_id: number
-  status: 'pending' | 'processing' | 'completed' | 'failed'
+  job_type: 'deck_generation' | 'quiz_generation' | null
+  status: JobStatus
   message: string | null
+  step: string | null
   progress: number | null
   result_id: number | null
+  document_id: number | null
   created_at: string
   completed_at: string | null
 }
@@ -193,41 +274,8 @@ export interface QuizGenerationRequest {
   question_count?: number
   question_types?: ('multiple_choice' | 'true_false' | 'fill_blank' | 'short_answer')[]
   difficulty?: 'easy' | 'medium' | 'hard' | 'mixed'
+  time_limit_minutes?: number | null
   focus_topics?: string[]
-}
-
-// Analytics types
-export interface AnalyticsOverview {
-  study_streak: number
-  longest_streak: number
-  total_study_time_minutes: number
-  avg_daily_study_minutes: number
-
-  total_documents: number
-  total_decks: number
-  total_cards: number
-  total_quizzes: number
-
-  cards_mastered: number
-  cards_learning: number
-  cards_new: number
-  mastery_rate: number
-
-  overall_accuracy: number
-  cards_studied_today: number
-  cards_due_today: number
-  quizzes_taken: number
-  average_quiz_score: number
-
-  last_study_date: string | null
-  recent_sessions: StudySession[]
-}
-
-export interface TopicAnalytics {
-  topics: TopicPerformance[]
-  weak_topics: string[]
-  strong_topics: string[]
-  recommended_review: string[]
 }
 
 export interface StudySession {
@@ -238,12 +286,44 @@ export interface StudySession {
   accuracy: number
 }
 
-export interface StudyProgressResponse {
-  period: 'week' | 'month' | 'all_time' | string
-  daily_stats: Array<{ date: string; cards: number; accuracy: number }>
+export interface AnalyticsOverview {
+  study_streak: number
+  longest_streak: number
+  total_study_time_minutes: number
+  avg_daily_study_minutes: number
+  total_documents: number
+  total_decks: number
+  total_cards: number
+  total_quizzes: number
+  cards_mastered: number
+  cards_learning: number
+  cards_new: number
+  mastery_rate: number
+  overall_accuracy: number
+  cards_studied_today: number
+  cards_due_today: number
+  reviews_due_today: number
+  quizzes_taken: number
+  average_quiz_score: number
+  last_study_date: string | null
+  recent_sessions: StudySession[]
+}
+
+export interface DailyStat {
+  date: string
+  cards: number
+  questions: number
+  minutes: number
+  accuracy: number
+  items: number
+}
+
+export interface StudyProgress {
+  period: string
+  daily_stats: DailyStat[]
   accuracy_trend: number[]
   volume_trend: number[]
-  this_week_vs_last: { cards: number; accuracy: number; time: number }
+  this_week_vs_last: { cards: number; accuracy: number; time: number; this_week_items: number; this_week_minutes: number }
   daily_goal: number
   goal_completion_rate: number
 }
@@ -255,18 +335,40 @@ export interface TopicPerformance {
   incorrect: number
   accuracy: number
   last_studied: string | null
-  trend: string
 }
 
-// Spaced repetition types
-export interface CardReview {
-  rating: 'again' | 'hard' | 'good' | 'easy'
-  time_spent_ms: number
+export interface TopicAnalytics {
+  topics: TopicPerformance[]
+  weak_topics: string[]
+  strong_topics: string[]
+  recommended_review: string[]
 }
+
+export interface MissedQuestion {
+  question_id: number
+  question_text: string
+  question_type: string
+  times_incorrect: number
+  times_correct: number
+  accuracy: number
+  topic: string | null
+  source_document: string | null
+}
+
+export interface Suggestion {
+  type: string
+  priority: 'high' | 'medium' | 'low'
+  title: string
+  description: string
+  action: string
+  target_id: number | null
+}
+
 
 export interface CardReviewResponse {
   card_id: number
-  next_review_at: string
+  next_review: string
   interval_days: number
-  ease_factor: number
+  easiness: number
+  repetitions: number
 }

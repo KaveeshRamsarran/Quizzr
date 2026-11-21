@@ -1,0 +1,81 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+3 0 obj
+<< /Length 1159 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 56 806 Tm (PHYS 101 Mechanics, Lecture 3) Tj
+/F2 20 Tf 1 0 0 1 56 768 Tm (Newton's Laws of Motion) Tj
+/F2 13.5 Tf 1 0 0 1 56 725 Tm (The First Law) Tj
+/F1 11 Tf 1 0 0 1 56 702 Tm (Newton's first law states that an object remains at rest or in uniform motion unless acted) Tj
+/F1 11 Tf 1 0 0 1 56 686.5 Tm (on by a net force. Inertia is the tendency of an object to resist changes in its motion.) Tj
+/F1 11 Tf 1 0 0 1 56 666.0 Tm (Mass is a measure of the amount of matter in an object and is measured in kilograms.) Tj
+/F2 13.5 Tf 1 0 0 1 56 637.5 Tm (The Second Law) Tj
+/F1 11 Tf 1 0 0 1 56 614.5 Tm (Newton's second law states that the net force on an object equals its mass times its) Tj
+/F1 11 Tf 1 0 0 1 56 599.0 Tm (acceleration \(F = ma\). The SI unit of force is the newton \(N\), equal to one kilogram metre) Tj
+/F1 11 Tf 1 0 0 1 56 583.5 Tm (per second squared.) Tj
+/F1 11 Tf 1 0 0 1 56 563.0 Tm (Weight is the force of gravity acting on an object, calculated as W = mg. On Earth, the) Tj
+/F1 11 Tf 1 0 0 1 56 547.5 Tm (acceleration due to gravity is approximately 9.8 m/s≤.) Tj
+/F1 8.5 Tf 1 0 0 1 280 30 Tm (Page 1 of 2) Tj
+ET
+endstream
+endobj
+4 0 obj
+<< /Type /Page /Parent 7 0 R /MediaBox [0 0 595 842] /Contents 3 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
+endobj
+5 0 obj
+<< /Length 1524 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 56 806 Tm (PHYS 101 Mechanics, Lecture 3) Tj
+/F2 13.5 Tf 1 0 0 1 56 760 Tm (The Third Law) Tj
+/F1 11 Tf 1 0 0 1 56 737 Tm (Newton's third law states that for every action there is an equal and opposite reaction.) Tj
+/F1 11 Tf 1 0 0 1 56 721.5 Tm (When you push on a wall, the wall pushes back on you with the same force.) Tj
+/F2 13.5 Tf 1 0 0 1 56 693.0 Tm (Friction) Tj
+/F1 11 Tf 1 0 0 1 56 670.0 Tm (Friction is a force that opposes the relative motion of two surfaces in contact. Static) Tj
+/F1 11 Tf 1 0 0 1 56 654.5 Tm (friction acts on objects at rest, while kinetic friction acts on moving objects.) Tj
+/F2 13.5 Tf 1 0 0 1 56 626.0 Tm (Momentum) Tj
+/F1 11 Tf 1 0 0 1 56 603.0 Tm (Momentum is the product of an object's mass and velocity \(p = mv\). The law of conservation) Tj
+/F1 11 Tf 1 0 0 1 56 587.5 Tm (of momentum states that the total momentum of a closed system remains constant.) Tj
+/F2 13.5 Tf 1 0 0 1 56 559.0 Tm (Solving Force Problems) Tj
+/F1 11 Tf 1 0 0 1 56 536.0 Tm (Steps for solving a force problem:) Tj
+/F1 11 Tf 1 0 0 1 56 515.5 Tm (1. Draw a free-body diagram showing every force on the object.) Tj
+/F1 11 Tf 1 0 0 1 56 499.0 Tm (2. Choose a coordinate system.) Tj
+/F1 11 Tf 1 0 0 1 56 482.5 Tm (3. Apply Newton's second law along each axis.) Tj
+/F1 11 Tf 1 0 0 1 56 466.0 Tm (4. Solve for the unknown quantity.) Tj
+/F1 11 Tf 1 0 0 1 56 449.5 Tm (Example: a 2 kg box pushed with a net force of 10 N accelerates at 5 m/s≤.) Tj
+/F1 8.5 Tf 1 0 0 1 280 30 Tm (Page 2 of 2) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 7 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
+endobj
+7 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R] /Count 2 >>
+endobj
+8 0 obj
+<< /Type /Catalog /Pages 7 0 R >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000015 00000 n 
+0000000112 00000 n 
+0000000214 00000 n 
+0000001425 00000 n 
+0000001561 00000 n 
+0000003137 00000 n 
+0000003273 00000 n 
+0000003336 00000 n 
+trailer
+<< /Size 9 /Root 8 0 R >>
+startxref
+3385
+%%EOF

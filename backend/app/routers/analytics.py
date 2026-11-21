@@ -4,7 +4,7 @@ Handles user analytics and study statistics
 """
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +13,7 @@ from app.database import get_session
 from app.models.user import User
 from app.schemas.analytics import (
     AnalyticsOverview, TopicAnalytics, StudyProgressResponse,
-    MissedQuestionsResponse, ImprovementSuggestions
+    MissedQuestionsResponse, ImprovementSuggestion
 )
 from app.services.analytics import AnalyticsService
 from app.routers.dependencies import get_current_user
@@ -94,7 +94,7 @@ async def get_missed_questions(
     return MissedQuestionsResponse(**missed)
 
 
-@router.get("/suggestions", response_model=ImprovementSuggestions)
+@router.get("/suggestions", response_model=List[ImprovementSuggestion])
 async def get_improvement_suggestions(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
@@ -103,29 +103,22 @@ async def get_improvement_suggestions(
     Get personalized improvement suggestions based on study patterns
     """
     analytics_service = AnalyticsService(session)
-    suggestions = await analytics_service.get_improvement_suggestions(current_user.id)
-    return ImprovementSuggestions(**suggestions)
+    return await analytics_service.get_improvement_suggestions(current_user.id)
 
 
 @router.get("/streak")
 async def get_streak_info(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    """
-    Get current streak information
-    """
-    last_study_at = getattr(current_user, "last_study_date", None)
-    current_streak = getattr(current_user, "study_streak", 0) or 0
-
+    """Current and longest study streak."""
+    overview = await AnalyticsService(session).get_overview(current_user.id)
+    last = overview["last_study_date"]
     return {
-        "current_streak": current_streak,
-        # This project currently does not persist a separate "longest streak".
-        # Return current streak for compatibility with the frontend.
-        "longest_streak": current_streak,
-        "last_study_at": last_study_at,
-        "studied_today": bool(
-            last_study_at and last_study_at.date() == datetime.utcnow().date()
-        ),
+        "current_streak": overview["study_streak"],
+        "longest_streak": overview["longest_streak"],
+        "last_study_at": last,
+        "studied_today": bool(last and last.date() == datetime.utcnow().date()),
     }
 
 

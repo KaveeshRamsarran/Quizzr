@@ -1,345 +1,105 @@
-# 🎓 Quizzr
+# Quizzr
 
-An AI-powered flashcard and quiz generation application that transforms PDF documents into interactive study materials using advanced natural language processing.
+Quizzr turns lecture PDFs into flashcards, quizzes and a spaced-repetition review schedule.
 
-![Quizzr](https://img.shields.io/badge/Status-Production%20Ready-green)
-![Python](https://img.shields.io/badge/Python-3.11+-blue)
-![React](https://img.shields.io/badge/React-18+-blue)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+Upload a PDF, and Quizzr reads it and splits it into study sections. From there you can make a deck or a quiz, study the cards that are due each day, and track your progress. Cards and questions are written on your own computer: no API keys, nothing sent to a cloud service. Each one keeps the sentence and page it came from.
 
-## ✨ Features
+## Features
 
-### 📚 Smart Document Processing
-- **PDF Upload & Processing**: Support for text-based and scanned PDFs with OCR fallback
-- **Intelligent Chunking**: Auto-detects document type (notes, slides, textbook) for optimal processing
-- **Full-Text Search**: Find content across all your uploaded documents
+- **PDF reading:** text extraction with header and footer cleanup, heading detection and section chunking. OCR for scanned pages runs when Tesseract is installed (it is in the Docker image).
+- **Flashcards:** definition, key-point, cloze and reverse cards. You can edit, add, delete and search cards, and export a deck as CSV or as an Anki import file.
+- **Quizzes:** multiple choice, true or false, fill in the blank and short answer, with an optional time limit. Feedback is given per question, and results are broken down by topic. Short-answer grading tolerates typos.
+- **Spaced repetition:** SM-2 scheduling. Each session shows due cards first, then cards you haven't studied. A card rated Again comes back before the session ends.
+- **Progress:** streaks, study time, daily activity, card mastery, quiz topics (weakest first) and the questions you miss most.
+- **Accounts:** email and password, guest accounts that can be upgraded later, profile, password change and account deletion.
+- **Light and dark mode.**
 
-### 🃏 AI-Powered Flashcard Generation
-- **Automatic Card Creation**: Generates question-answer pairs from document content
-- **Anti-Hallucination**: Two-stage prompting ensures cards are grounded in source material
-- **Multiple Card Types**: Basic, cloze deletion, and image-based cards
-- **Difficulty Calibration**: Cards are tagged with difficulty levels (easy, medium, hard)
+### How the cards are made
 
-### 📝 Quiz Generation
-- **Multiple Question Types**: Multiple choice, true/false, fill-in-the-blank, short answer
-- **Customizable Quizzes**: Set time limits, passing scores, and question counts
-- **Performance Tracking**: Track attempts, scores, and progress over time
+The built-in generator (`backend/app/services/local_generator.py`) runs offline and finishes in a second or two. It builds study items from:
 
-### 🧠 Spaced Repetition System
-- **SM-2 Algorithm**: Scientifically-proven algorithm optimizes review timing
-- **Personalized Scheduling**: Cards are scheduled based on individual performance
-- **Streak Tracking**: Maintain study streaks to build consistent habits
+- **definitions:** "X is a...", "X refers to...", "... is called X", "X: ..."
+- **acronyms:** "Adenosine Triphosphate (ATP)"
+- **bulleted lists** under a heading
+- **key sentences:** the ones carrying the document's most important terms, used for fill-the-gap cards, true or false and fill in the blank
 
-### 📊 Analytics & Insights
-- **Study Statistics**: Track cards studied, time spent, and mastery levels
-- **Topic Mastery**: Visualize strength across different topics
-- **Performance Trends**: Charts showing progress over time
+It also recognises laws ("The law of X states that..."), people and dates ("James Watt improved the steam engine in 1769"), examples, formulas such as F = ma, time complexities on slides ("Search: O(n)") and numbered steps. Multiple-choice distractors are of the same kind as the answer: other terms, other people, nearby years, other complexities. Because every item is built from a real sentence in your notes, nothing is invented. Documents written in full sentences give the most cards; slides with only fragments give fewer.
 
-## 🏗️ Architecture
+## Run it
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client (React)                          │
-│    React 18 │ TypeScript │ TailwindCSS │ React Query │ Zustand │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ HTTP/REST
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      API Gateway (FastAPI)                      │
-│         JWT Auth │ Rate Limiting │ CORS │ Validation           │
-└────────┬────────────────────┬────────────────────┬──────────────┘
-         │                    │                    │
-         ▼                    ▼                    ▼
-┌─────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│ PostgreSQL  │    │   Redis/Celery   │    │    OpenAI API   │
-│  Database   │    │   Task Queue     │    │  GPT-4 Turbo    │
-└─────────────┘    └──────────────────┘    └─────────────────┘
-```
+### Windows, one click
 
-## 🚀 Quick Start
+Double-click `start-servers.bat`. The first run creates the Python environment and installs packages. After that it starts both servers and opens http://localhost:3000.
 
-### Prerequisites
+### Manually
 
-- Docker & Docker Compose
-- (Option A) Ollama (local Llama-family models)
-- (Option B) OpenAI API Key
-
-### 1. Clone & Setup
+Requirements: Python 3.11 or later, and Node 18 or later.
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/quizzr.git
-cd quizzr
-
-# Copy environment file
-cp .env.example .env
-```
-
-### 2. Configure Environment
-
-Edit `.env` and choose one LLM option.
-
-**Option A: Local (recommended)**
-
-- Install Ollama and start it (`ollama serve`)
-- Pull a model, e.g. `ollama pull llama3.1`
-
-```env
-LLM_PROVIDER=ollama
-LLM_MODEL=llama3.1
-OLLAMA_BASE_URL=http://localhost:11434
-```
-
-**Option B: OpenAI**
-
-```env
-OPENAI_API_KEY=sk-your-api-key-here
-SECRET_KEY=your-secure-secret-key-min-32-chars
-```
-
-### 3. Start with Docker
-
-```bash
-# Build and start all services
-docker-compose up --build
-
-# Or run in detached mode
-docker-compose up -d --build
-```
-
-### 4. Access the Application
-
-- **Frontend**: http://localhost:3000
-- **API Documentation**: http://localhost:8002/docs
-- **API (Redoc)**: http://localhost:8002/redoc
-
-## 📁 Project Structure
-
-```
-quizzr/
-├── backend/
-│   ├── app/
-│   │   ├── models/          # SQLAlchemy database models
-│   │   ├── schemas/         # Pydantic validation schemas
-│   │   ├── services/        # Business logic layer
-│   │   ├── routers/         # API route handlers
-│   │   ├── tasks/           # Celery background tasks
-│   │   ├── config.py        # Configuration management
-│   │   ├── database.py      # Database connection
-│   │   ├── celery_app.py    # Celery configuration
-│   │   └── main.py          # FastAPI application
-│   ├── tests/               # Backend tests
-│   ├── uploads/             # Uploaded files (gitignored)
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── components/      # Reusable React components
-│   │   ├── pages/           # Page components
-│   │   ├── stores/          # Zustand state stores
-│   │   ├── lib/             # API client & utilities
-│   │   ├── types/           # TypeScript type definitions
-│   │   └── App.tsx          # Main application component
-│   ├── public/
-│   ├── package.json
-│   └── vite.config.ts
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
-
-## 🔌 API Reference
-
-### Authentication
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/auth/register` | POST | Register new user |
-| `/api/v1/auth/login` | POST | Login and get tokens |
-| `/api/v1/auth/refresh` | POST | Refresh access token |
-| `/api/v1/auth/me` | GET | Get current user |
-| `/api/v1/auth/guest` | POST | Create guest account |
-
-### Documents
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/documents` | GET | List user's documents |
-| `/api/v1/documents` | POST | Upload new document |
-| `/api/v1/documents/{id}` | GET | Get document details |
-| `/api/v1/documents/{id}` | DELETE | Delete document |
-
-### Decks & Cards
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/decks` | GET | List user's decks |
-| `/api/v1/decks` | POST | Create new deck |
-| `/api/v1/decks/{id}` | GET | Get deck with cards |
-| `/api/v1/decks/{id}/cards` | POST | Add card to deck |
-| `/api/v1/decks/{id}/due` | GET | Get cards due for review |
-| `/api/v1/decks/{id}/study` | POST | Submit study session |
-
-### Quizzes
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/quizzes` | GET | List user's quizzes |
-| `/api/v1/quizzes` | POST | Create new quiz |
-| `/api/v1/quizzes/{id}/attempts` | POST | Start quiz attempt |
-| `/api/v1/quizzes/{id}/attempts/{aid}/answers` | POST | Submit answer |
-| `/api/v1/quizzes/{id}/attempts/{aid}/finish` | POST | Finish attempt |
-
-### Generation
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/generation/deck` | POST | Generate deck from document |
-| `/api/v1/generation/quiz` | POST | Generate quiz from document |
-| `/api/v1/generation/jobs` | GET | Get generation job status |
-
-### Analytics
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/analytics` | GET | Get user analytics |
-| `/api/v1/analytics/streak` | GET | Get streak information |
-
-## 🧪 Running Tests
-
-### Backend Tests
-
-```bash
-# Run all tests
+# API (http://127.0.0.1:8002, docs at /docs)
 cd backend
-pytest
-
-# Run with coverage
-pytest --cov=app tests/
-
-# Run specific test file
-pytest tests/test_auth.py -v
-```
-
-### Frontend Tests
-
-```bash
-cd frontend
-npm test
-
-# Run with coverage
-npm run test:coverage
-```
-
-## 🔧 Development
-
-### Running Locally (Without Docker)
-
-#### Backend
-
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-
-# Install dependencies
+python -m venv .venv
+.venv/Scripts/activate        # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
+uvicorn app.main:app --port 8002
 
-# Start PostgreSQL and Redis (required)
-# Then run the application
-uvicorn app.main:app --reload
-
-# In another terminal, start Celery worker
-celery -A app.celery_app worker --loglevel=info
-
-# In another terminal, start Celery beat
-celery -A app.celery_app beat --loglevel=info
-```
-
-#### Frontend
-
-```bash
+# Web app (http://localhost:3000), in a second terminal
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
-### Environment Variables
+There is no Redis, worker or database server to run. Uploads and generation run as background jobs inside the API process, and data lives in `backend/quizzr.db` (SQLite).
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://...` |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
-| `SECRET_KEY` | JWT signing key | Required |
-| `OPENAI_API_KEY` | OpenAI API key | Required |
-| `OPENAI_MODEL` | Model to use | `gpt-4-turbo-preview` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiry | `30` |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token expiry | `7` |
+### Single server or Docker
 
-## 🎯 Spaced Repetition (SM-2) Algorithm
+Run `npm run build` in `frontend/`. The API then serves the built app at http://127.0.0.1:8002.
 
-Quizzr implements the SuperMemo 2 algorithm for optimal card scheduling:
+`docker compose up --build` runs the same single server against PostgreSQL, with OCR included.
+
+## Configuration
+
+Copy `.env.example` to `.env` (in the repo root or in `backend/`). Every setting is optional. If `SECRET_KEY` is not set, a random key is generated and stored in `backend/.secret_key`.
+
+## Project layout
 
 ```
-EF' = EF + (0.1 - (5-q) * (0.08 + (5-q) * 0.02))
-
-Where:
-- EF = Ease Factor (starts at 2.5)
-- q = Quality of response (0-5)
-  - 0-1: Complete failure ("Again")
-  - 2-3: Difficult recall ("Hard")
-  - 4: Correct with effort ("Good")
-  - 5: Perfect recall ("Easy")
+backend/
+  app/
+    models/       SQLAlchemy models (documents, decks, cards, quizzes, review log...)
+    routers/      FastAPI routes under /api/v1
+    schemas/      Pydantic request and response models
+    services/
+      pdf_processing.py   extraction, cleanup, chunking
+      local_generator.py  the built-in card and question generator
+      generation.py       deck and quiz generation
+      jobs.py             in-process background jobs
+      analytics.py, spaced_repetition.py, quiz.py, deck.py, auth.py
+  tests/          pytest suite (pytest -q)
+frontend/
+  src/
+    pages/        screens (Today, Documents, Decks, Study, Quizzes, Progress, Settings...)
+    components/   layout, dialogs, shared controls
+    lib/          API client, formatting, theme
+    styles/       design tokens
 ```
 
-**Interval calculation:**
-- First review: 1 day
-- Second review: 6 days
-- Subsequent: `interval * EF`
+## Sample lectures
 
-## 🔒 Security Features
+`samples/lectures/` holds five short lecture PDFs in different styles (biology notes, a history lecture, CS slides, an economics textbook chapter, a physics lecture) to try the app with. `samples/make_lectures.py` rebuilds them, and `samples/evaluate.py` prints every card and question the generator makes from them:
 
-- **JWT Authentication** with access and refresh tokens
-- **Password Hashing** using bcrypt
-- **Rate Limiting** on sensitive endpoints
-- **CORS Protection** for API requests
-- **Input Validation** with Pydantic schemas
-- **SQL Injection Prevention** via SQLAlchemy ORM
+```bash
+backend/.venv/Scripts/python samples/evaluate.py            # all five
+backend/.venv/Scripts/python samples/evaluate.py hist110    # one
+```
 
-## 📈 Scaling Considerations
+## Tests
 
-- **Horizontal Scaling**: Stateless API design allows multiple backend instances
-- **Task Queue**: Celery with Redis handles long-running AI generation tasks
-- **Database**: PostgreSQL with async support for high concurrency
-- **Caching**: Redis caching for frequently accessed data
-- **CDN**: Static frontend can be served via CDN
+```bash
+cd backend && pytest -q
+cd frontend && npm run lint && npm run build
+```
 
-## 🤝 Contributing
+## License
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [React](https://reactjs.org/) - UI library
-- [OpenAI](https://openai.com/) - GPT-4 API
-- [SuperMemo](https://www.supermemo.com/) - SM-2 algorithm
-- [Tailwind CSS](https://tailwindcss.com/) - Styling framework
-
----
-
-Built with ❤️ for students and lifelong learners
+MIT

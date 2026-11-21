@@ -4,11 +4,15 @@ SM-2 algorithm implementation for flashcard scheduling
 """
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from sqlalchemy import DateTime, Integer, ForeignKey, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:  # pragma: no cover
+    from app.models.deck import Card
+    from app.models.user import User
 
 
 class SpacedRepetitionSchedule(Base):
@@ -134,3 +138,21 @@ class SpacedRepetitionSchedule(Base):
     
     def __repr__(self) -> str:
         return f"<SpacedRepetitionSchedule(card_id={self.card_id}, interval={self.interval}, next={self.next_review})>"
+
+
+class CardReviewLog(Base):
+    """One row per flashcard review; the source of study history and analytics."""
+    __tablename__ = "card_review_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    card_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cards.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    deck_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    quality: Mapped[int] = mapped_column(Integer, nullable=False)
+    interval_days: Mapped[int] = mapped_column(Integer, default=1)
+    time_spent_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True, nullable=False)

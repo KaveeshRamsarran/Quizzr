@@ -5,12 +5,18 @@ Handles uploaded PDFs, extracted pages, and content chunks
 
 import enum
 from datetime import datetime
-from typing import Optional, List
+from typing import TYPE_CHECKING, Optional, List
 from sqlalchemy import String, DateTime, Integer, ForeignKey, Text, Boolean, Enum, JSON
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:  # pragma: no cover
+    from app.models.course import Course
+    from app.models.deck import Deck
+    from app.models.quiz import Quiz
+    from app.models.user import User
 
 
 class DocumentStyle(str, enum.Enum):

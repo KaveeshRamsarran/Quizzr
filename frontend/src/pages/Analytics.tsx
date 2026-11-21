@@ -1,300 +1,166 @@
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts'
-import {
-  FireIcon,
-  AcademicCapIcon,
-  ClockIcon,
-  TrophyIcon,
-  ChartBarIcon,
-  BookOpenIcon,
-} from '@heroicons/react/24/outline'
-import { analyticsApi } from '../lib/api'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { BoltIcon, ChartBarIcon, ClockIcon, FireIcon, TrophyIcon } from '@heroicons/react/24/outline'
+import { analyticsApi, errorMessage } from '../lib/api'
+import { EmptyState, ErrorState, PageHeader, SectionTitle, Segmented, SkeletonRows } from '../components/ui'
+import { CountUp, Item, Page, ProgressBar, Stagger } from '../components/motion'
+import type { DailyStat } from '../types'
 
-const COLORS = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444']
+type Range = '7' | '30' | '90'
+
+function ChartTooltip({ active, payload }: { active?: boolean; payload?: { payload: DailyStat }[] }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0].payload
+  return (
+    <div className="card" style={{ padding: '10px 14px', fontSize: 'var(--text-sm)', boxShadow: 'var(--shadow-lift)' }}>
+      <div className="row-title">{new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+      <div className="muted">{d.cards} cards, {d.questions} questions</div>
+      {d.items > 0 && <div className="muted">{Math.round(d.accuracy)}% right, {Math.round(d.minutes)} min</div>}
+    </div>
+  )
+}
 
 export default function Analytics() {
-  const { data: overview, isLoading: isOverviewLoading } = useQuery({
-    queryKey: ['analytics', 'overview'],
-    queryFn: analyticsApi.getOverview,
-  })
+  const [params, setParams] = useSearchParams()
+  const range = (['7', '30', '90'].includes(params.get('days') ?? '') ? params.get('days') : '30') as Range
 
-  const { data: progress, isLoading: isProgressLoading } = useQuery({
-    queryKey: ['analytics', 'progress', 30],
-    queryFn: () => analyticsApi.getProgress(30),
-  })
+  const overview = useQuery({ queryKey: ['analytics', 'overview'], queryFn: analyticsApi.getOverview })
+  const progress = useQuery({ queryKey: ['analytics', 'progress', range], queryFn: () => analyticsApi.getProgress(Number(range)) })
+  const topics = useQuery({ queryKey: ['analytics', 'topics'], queryFn: analyticsApi.getTopics })
+  const missed = useQuery({ queryKey: ['analytics', 'missed'], queryFn: () => analyticsApi.getMissed(8) })
 
-  const { data: topics, isLoading: isTopicsLoading } = useQuery({
-    queryKey: ['analytics', 'topics'],
-    queryFn: () => analyticsApi.getTopics(),
-  })
-
-  const isLoading = isOverviewLoading || isProgressLoading || isTopicsLoading
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-      </div>
-    )
-  }
-
-  if (!overview || !progress) return null
-
-  const studyActivityData =
-    progress.daily_stats?.map((item) => ({
-      date: new Date(item.date).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      }),
-      cards: item.cards,
-    })) || []
-
-  const topicMasteryData =
-    topics?.topics?.map((item) => ({
-      name: item.topic,
-      mastery: item.accuracy,
-    })) || []
-
-  const cardStatusDistribution = [
-    { name: 'New', value: overview.cards_new || 0 },
-    { name: 'Learning', value: overview.cards_learning || 0 },
-    { name: 'Mastered', value: overview.cards_mastered || 0 },
-  ]
-
-  const strongestTopic = topics?.topics?.length
-    ? topics.topics.reduce((best, cur) => (cur.accuracy > best.accuracy ? cur : best)).topic
-    : null
-
-  const weakestTopic = topics?.topics?.length
-    ? topics.topics.reduce((worst, cur) => (cur.accuracy < worst.accuracy ? cur : worst)).topic
-    : null
-
-  const bestStudyDay = progress.daily_stats?.length
-    ? progress.daily_stats.reduce((best, cur) => (cur.cards > best.cards ? cur : best)).date
-    : null
+  const o = overview.data
+  const p = progress.data
+  const hasActivity = !!p?.daily_stats.some((d) => d.items > 0)
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Study Analytics</h1>
-        <p className="text-gray-400">Track your learning progress and performance</p>
-      </div>
+    <Page>
+      <PageHeader
+        title="Progress"
+        sub="How your studying is going"
+        actions={
+          <Segmented<Range>
+            label="Time range"
+            value={range}
+            onChange={(v) => setParams(v === '30' ? {} : { days: v }, { replace: true })}
+            options={[{ value: '7', label: '7 days' }, { value: '30', label: '30 days' }, { value: '90', label: '90 days' }]}
+          />
+        }
+      />
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card bg-gray-800 border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400">Current Streak</span>
-            <FireIcon className="w-5 h-5 text-orange-500" />
-          </div>
-          <p className="text-3xl font-bold text-white">
-            {overview.study_streak || 0} days
-          </p>
-          <p className="text-sm text-gray-400">
-            Best: {overview.longest_streak || 0} days
-          </p>
-        </div>
+      {overview.isError ? <ErrorState message={errorMessage(overview.error)} onRetry={() => overview.refetch()} /> : (
+        <Stagger className="stats">
+          {[
+            { label: 'Current streak', icon: FireIcon, value: o?.study_streak, unit: o?.study_streak === 1 ? 'day' : 'days' },
+            { label: 'Longest streak', icon: TrophyIcon, value: o?.longest_streak, unit: o?.longest_streak === 1 ? 'day' : 'days' },
+            { label: 'Time studied', icon: ClockIcon, value: o?.total_study_time_minutes, unit: 'min' },
+            { label: 'Answered right', icon: BoltIcon, value: o ? Math.round(o.overall_accuracy) : undefined, unit: '%' },
+          ].map((s) => (
+            <Item key={s.label} className="card stat">
+              <div className="stat__top"><span>{s.label}</span><s.icon aria-hidden="true" /></div>
+              <div className="stat__value">{s.value == null ? '–' : <CountUp value={s.value} />}<small>{s.unit}</small></div>
+            </Item>
+          ))}
+        </Stagger>
+      )}
 
-        <div className="card bg-gray-800 border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400">Cards Mastered</span>
-            <TrophyIcon className="w-5 h-5 text-yellow-500" />
-          </div>
-          <p className="text-3xl font-bold text-white">
-            {overview.cards_mastered || 0}
-          </p>
-          <p className="text-sm text-gray-400">
-            of {overview.total_cards || 0} total
-          </p>
-        </div>
-
-        <div className="card bg-gray-800 border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400">Study Time</span>
-            <ClockIcon className="w-5 h-5 text-blue-500" />
-          </div>
-          <p className="text-3xl font-bold text-white">
-            {Math.round((overview.total_study_time_minutes || 0) / 60)}h
-          </p>
-          <p className="text-sm text-gray-400">total study time</p>
-        </div>
-
-        <div className="card bg-gray-800 border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400">Quiz Average</span>
-            <AcademicCapIcon className="w-5 h-5 text-green-500" />
-          </div>
-          <p className="text-3xl font-bold text-white">
-            {overview.average_quiz_score || 0}%
-          </p>
-          <p className="text-sm text-gray-400">
-            {overview.quizzes_taken || 0} quizzes taken
-          </p>
-        </div>
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Study Activity */}
-        <div className="card bg-gray-800 border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-white">Study Activity</h3>
-            <ChartBarIcon className="w-5 h-5 text-gray-500" />
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={studyActivityData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="date" fontSize={12} stroke="#9CA3AF" />
-                <YAxis fontSize={12} stroke="#9CA3AF" />
-                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }} labelStyle={{ color: '#F9FAFB' }} />
-                <Line
-                  type="monotone"
-                  dataKey="cards"
-                  stroke="#8B5CF6"
-                  strokeWidth={2}
-                  dot={{ fill: '#8B5CF6' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Topic Mastery */}
-        <div className="card bg-gray-800 border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-white">Topic Mastery</h3>
-            <BookOpenIcon className="w-5 h-5 text-gray-500" />
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topicMasteryData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" domain={[0, 100]} fontSize={12} stroke="#9CA3AF" />
-                <YAxis dataKey="name" type="category" width={80} fontSize={12} stroke="#9CA3AF" />
-                <Tooltip formatter={(value) => `${value}%`} contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }} labelStyle={{ color: '#F9FAFB' }} />
-                <Bar dataKey="mastery" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Card Status Distribution */}
-        <div className="card bg-gray-800 border-gray-700 p-6">
-          <h3 className="font-semibold text-white mb-6">Card Status</h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={cardStatusDistribution}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={60}
-                  dataKey="value"
-                  label={({ name, percent }) =>
-                    `${name} ${(percent * 100).toFixed(0)}%`
-                  }
-                >
-                  {cardStatusDistribution.map((_, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }} labelStyle={{ color: '#F9FAFB' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="card bg-gray-800 border-gray-700 p-6 lg:col-span-2">
-          <h3 className="font-semibold text-white mb-4">Recent Sessions</h3>
-          {overview.recent_sessions?.length > 0 ? (
-            <div className="space-y-3">
-              {overview.recent_sessions
-                .slice(0, 5)
-                .map(
-                  (
-                    session: {
-                      date: string
-                      duration_minutes: number
-                      cards_studied: number
-                      questions_answered: number
-                      accuracy: number
-                    },
-                    index: number
-                  ) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0"
-                    >
-                      <div>
-                        <p className="font-medium text-white">
-                          Study session
-                        </p>
-                        <p className="text-sm text-gray-400">
-                          {session.cards_studied} cards • {session.questions_answered} questions •{' '}
-                          {Math.round(session.duration_minutes)} min
-                        </p>
-                      </div>
-                      <span className="text-sm text-gray-400">
-                        {new Date(session.date).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )
-                )}
+      <section className="section" aria-labelledby="activity-title">
+        <SectionTitle
+          title={<span id="activity-title">Daily activity</span>}
+          action={p && hasActivity ? <span className="small muted">{p.this_week_vs_last.this_week_items} items this week</span> : undefined}
+        />
+        {progress.isLoading ? <div className="skeleton" style={{ height: 320, borderRadius: 18 }} /> : progress.isError ? (
+          <ErrorState message={errorMessage(progress.error)} onRetry={() => progress.refetch()} />
+        ) : !hasActivity ? (
+          <div className="card"><EmptyState icon={<ChartBarIcon />} title="No activity yet">Study a deck or take a quiz and your daily totals show up here.</EmptyState></div>
+        ) : (
+          <div className="card" style={{ padding: '20px 12px 12px' }}>
+            <div style={{ width: '100%', height: 300 }} role="img" aria-label={`Cards and questions studied per day over the last ${range} days`}>
+              <ResponsiveContainer>
+                <AreaChart data={p!.daily_stats} margin={{ top: 8, right: 12, bottom: 0, left: -16 }}>
+                  <CartesianGrid stroke="var(--color-rule)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(v: string) => new Date(v + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                    tick={{ fill: 'var(--color-muted)', fontSize: 12, fontFamily: 'var(--font-display)' }}
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={28}
+                  />
+                  <YAxis allowDecimals={false} tick={{ fill: 'var(--color-muted)', fontSize: 12, fontFamily: 'var(--font-display)' }} axisLine={false} tickLine={false} width={44} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--color-rule-2)', strokeDasharray: '4 4' }} />
+                  <Area type="monotone" dataKey="items" stroke="var(--color-accent)" strokeWidth={2.5} fill="var(--color-accent-soft)" fillOpacity={0.6} animationDuration={900} dot={false} activeDot={{ r: 5, fill: 'var(--color-accent)', stroke: 'var(--color-surface)', strokeWidth: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
+            <p className="small muted" style={{ padding: '4px 12px 0' }}>Daily goal {p!.daily_goal} cards, reached on {Math.round((p!.goal_completion_rate / 100) * 7)} of the last 7 days.</p>
+          </div>
+        )}
+      </section>
+
+      <div className="grid gap-x-8 lg:grid-cols-2">
+        <section className="section" aria-labelledby="mastery-title">
+          <SectionTitle title={<span id="mastery-title">Card mastery</span>} />
+          {o ? (
+            o.total_cards === 0 ? <div className="card card--soft" style={{ padding: 18 }}><p className="small muted">No cards yet.</p></div> : (
+              <div className="card card--pad grid gap-5">
+                {([
+                  ['Mastered', o.cards_mastered, 'Seen again in three weeks or more'],
+                  ['Learning', o.cards_learning, 'Studied and coming back soon'],
+                  ['Not studied yet', o.cards_new, 'Waiting in a deck'],
+                ] as const).map(([label, n, hint]) => (
+                  <div key={label}>
+                    <div className="flex items-baseline justify-between gap-3" style={{ marginBottom: 8 }}>
+                      <div><span className="row-title">{label}</span> <span className="small muted">{hint}</span></div>
+                      <span className="figure-font" style={{ color: 'var(--color-ink)', fontSize: '1.15rem' }}>{n}</span>
+                    </div>
+                    <ProgressBar value={(n / o.total_cards) * 100} label={`${label} share`} />
+                  </div>
+                ))}
+              </div>
+            )
+          ) : <SkeletonRows rows={1} height={180} />}
+        </section>
+
+        <section className="section" aria-labelledby="topics-title">
+          <SectionTitle title={<span id="topics-title">Quiz topics</span>} action={<span className="small muted">Weakest first</span>} />
+          {topics.isLoading ? <SkeletonRows rows={1} height={180} /> : !topics.data?.topics.length ? (
+            <div className="card card--soft" style={{ padding: 18 }}><p className="small muted">Take a quiz to see how you do on each topic.</p></div>
           ) : (
-            <p className="text-gray-400 text-center py-8">
-              No study sessions yet. Start studying to see your progress!
-            </p>
+            <div className="card card--pad grid gap-5">
+              {topics.data.topics.slice(0, 6).map((t) => (
+                <div key={t.topic}>
+                  <div className="flex items-baseline justify-between gap-3" style={{ marginBottom: 8 }}>
+                    <span className="row-title truncate">{t.topic}</span>
+                    <span className="figure-font small" style={{ color: t.accuracy < 70 ? 'var(--color-error)' : 'var(--color-ink)' }}>{Math.round(t.accuracy)}%</span>
+                  </div>
+                  <ProgressBar value={t.accuracy} label={`${t.topic} accuracy`} />
+                </div>
+              ))}
+            </div>
           )}
-        </div>
+        </section>
       </div>
 
-      {/* Performance Insights */}
-      <div className="card bg-gray-800 border-gray-700 p-6">
-        <h3 className="font-semibold text-white mb-4">Performance Insights</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-4 bg-green-900/30 rounded-lg">
-            <p className="text-green-400 font-medium mb-1">Strongest Topic</p>
-            <p className="text-lg text-white">
-              {strongestTopic || 'N/A'}
-            </p>
-          </div>
-          <div className="text-center p-4 bg-orange-900/30 rounded-lg">
-            <p className="text-orange-400 font-medium mb-1">Needs Work</p>
-            <p className="text-lg text-white">
-              {weakestTopic || 'N/A'}
-            </p>
-          </div>
-          <div className="text-center p-4 bg-blue-900/30 rounded-lg">
-            <p className="text-blue-400 font-medium mb-1">Best Study Time</p>
-            <p className="text-lg text-white">
-              {bestStudyDay ? new Date(bestStudyDay).toLocaleDateString() : 'N/A'}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+      <section className="section" aria-labelledby="missed-title">
+        <SectionTitle title={<span id="missed-title">Questions to revisit</span>} />
+        {missed.isLoading ? <SkeletonRows rows={2} /> : !missed.data?.questions.length ? (
+          <div className="card card--soft" style={{ padding: 18 }}><p className="small muted">Questions you get wrong show up here so you can go back to them.</p></div>
+        ) : (
+          <Stagger className="card list">
+            {missed.data.questions.map((q) => (
+              <Item key={q.question_id} className="list-row">
+                <div className="flex-1 min-w-0">
+                  <p className="row-title">{q.question_text}</p>
+                  <p className="row-meta">{q.source_document}</p>
+                </div>
+                <span className="badge badge--error">Missed {q.times_incorrect}×</span>
+              </Item>
+            ))}
+          </Stagger>
+        )}
+      </section>
+    </Page>
   )
 }

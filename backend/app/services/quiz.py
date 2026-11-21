@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Optional, List, Any
 import random
 import json
+import re
+import difflib
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
@@ -450,41 +452,67 @@ class QuizService:
             "explanation": question.explanation if quiz.show_explanations else None
         }
     
+    @staticmethod
+    def _norm(value: Any) -> str:
+        text = str(value or "").lower().strip()
+        text = re.sub(r"^(the|a|an)\s+", "", text)
+        text = re.sub(r"[^a-z0-9%.\s-]", "", text)
+        return re.sub(r"\s+", " ", text).strip(" .")
+
+    def _text_matches(self, given: Any, expected: str) -> bool:
+        g, e = self._norm(given), self._norm(expected)
+        if not g:
+            return False
+        if g == e:
+            return True
+        # Allow small typos and plural/singular differences on short answers.
+        if len(e) <= 40 and difflib.SequenceMatcher(None, g, e).ratio() >= 0.85:
+            return True
+        if g.rstrip("s") == e.rstrip("s"):
+            return True
+        # Longer expected answers: accept when most of the key words are present.
+        e_words = {w for w in e.split() if len(w) > 3}
+        if len(e_words) >= 4:
+            g_words = set(g.split())
+            return len(e_words & g_words) / len(e_words) >= 0.6
+        return False
+
     def _check_answer(self, question: QuizQuestion, user_answer: Any) -> bool:
         """Check if answer is correct"""
-        correct = question.correct_answer
-        
-        if question.question_type == QuestionType.MCQ:
-            return str(user_answer).lower().strip() == correct.lower().strip()
-        
-        elif question.question_type == QuestionType.TRUE_FALSE:
-            return str(user_answer).lower().strip() == correct.lower().strip()
-        
-        elif question.question_type == QuestionType.MULTI_SELECT:
+        correct = question.correct_answer or ""
+
+        if question.question_type in (QuestionType.MCQ, QuestionType.TRUE_FALSE):
+            given = str(user_answer).lower().strip()
+            if given == correct.lower().strip():
+                return True
+            # Accept the option text as well as its id.
+            for option in question.options or []:
+                if isinstance(option, dict) and str(option.get("id", "")).lower() == correct.lower().strip():
+                    return self._norm(option.get("text")) == self._norm(user_answer)
+            return False
+
+        if question.question_type == QuestionType.MULTI_SELECT:
             try:
                 correct_set = set(json.loads(correct)) if isinstance(correct, str) else set(correct)
                 user_set = set(user_answer) if isinstance(user_answer, list) else set(json.loads(user_answer))
                 return correct_set == user_set
-            except:
+            except (ValueError, TypeError):
                 return False
-        
-        elif question.question_type == QuestionType.SHORT_ANSWER:
-            # Case-insensitive comparison, trimmed
-            return str(user_answer).lower().strip() == correct.lower().strip()
-        
-        elif question.question_type == QuestionType.FILL_BLANK:
-            return str(user_answer).lower().strip() == correct.lower().strip()
-        
-        elif question.question_type == QuestionType.MATCHING:
+
+        if question.question_type in (QuestionType.SHORT_ANSWER, QuestionType.FILL_BLANK):
+            alternatives = [a for a in re.split(r"\s*(?:/|\bor\b)\s*", correct) if a] if len(correct) < 60 else []
+            return self._text_matches(user_answer, correct) or any(self._text_matches(user_answer, a) for a in alternatives)
+
+        if question.question_type == QuestionType.MATCHING:
             try:
                 correct_dict = json.loads(correct) if isinstance(correct, str) else correct
                 user_dict = user_answer if isinstance(user_answer, dict) else json.loads(user_answer)
                 return correct_dict == user_dict
-            except:
+            except (ValueError, TypeError):
                 return False
-        
+
         return False
-    
+
     async def finish_attempt(
         self,
         attempt_id: int,

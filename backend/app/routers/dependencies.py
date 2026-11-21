@@ -123,8 +123,8 @@ def require_role(required_role: UserRole):
         current_user: User = Depends(get_current_user)
     ) -> User:
         role_hierarchy = {
-            UserRole.FREE: 0,
-            UserRole.PREMIUM: 1,
+            UserRole.GUEST: 0,
+            UserRole.STANDARD: 1,
             UserRole.ADMIN: 2
         }
         

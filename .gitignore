@@ -10,8 +10,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
+/backend/lib/
 parts/
 sdist/
 var/
@@ -25,6 +26,7 @@ htmlcov/
 
 # Virtual environments
 venv/
+.venv/
 ENV/
 env/
 
@@ -43,6 +45,10 @@ env/
 # Uploads
 uploads/
 *.pdf
+!samples/lectures/*.pdf
+
+# Hallmark working files
+.hallmark/
 
 # Node
 node_modules/
@@ -68,6 +74,12 @@ celerybeat.pid
 
 # Database
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Local signing key generated on first run
+backend/.secret_key
 *.sqlite3
 
 # Temporary files

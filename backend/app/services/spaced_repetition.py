@@ -6,7 +6,7 @@ Implements SM-2 algorithm for flashcard scheduling
 from datetime import datetime, timedelta
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
 from app.models.spaced_repetition import SpacedRepetitionSchedule
@@ -251,6 +251,8 @@ class SpacedRepetitionService:
                 Card.is_suspended == False,
                 ~Card.id.in_(subquery)
             )
+            .options(selectinload(Card.tags).selectinload(CardTag.tag))
+            .order_by(Card.id)
             .limit(limit)
         )
         return list(result.scalars().all())

@@ -1,160 +1,70 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { ExclamationCircleIcon } from '@heroicons/react/24/outline'
+import { authApi, errorMessage } from '../lib/api'
 import { useAuthStore } from '../stores/authStore'
-import { authApi } from '../lib/api'
-import toast from 'react-hot-toast'
+import { Brand, Button, Field } from '../components/ui'
+import AuthShell from './AuthShell'
 
 export default function Register() {
   const navigate = useNavigate()
-  const { login } = useAuthStore()
+  const login = useAuthStore((s) => s.login)
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [displayName, setDisplayName] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validate = () => {
+    const next: Record<string, string> = {}
+    if (!name.trim()) next.name = 'Enter your name.'
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) next.email = 'Enter a valid email address.'
+    if (password.length < 8) next.password = 'Use at least 8 characters.'
+    setErrors(next)
+    const first = Object.keys(next)[0]
+    if (first) document.getElementById(first)?.focus()
+    return !first
+  }
+
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
-
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match')
-      return
-    }
-
-    if (password.length < 8) {
-      toast.error('Password must be at least 8 characters')
-      return
-    }
-
+    setFormError(null)
+    if (!validate()) return
     setLoading(true)
-
     try {
-      const response = await authApi.register(email, password, displayName || undefined)
-      login(response.user, response.access_token, response.refresh_token)
-      toast.success('Account created successfully!')
-      navigate('/dashboard')
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Registration failed')
+      const data = await authApi.register(email.trim(), password, name.trim())
+      login(data.user, data.access_token, data.refresh_token)
+      navigate('/upload', { replace: true })
+    } catch (err) {
+      setFormError(errorMessage(err, 'Couldn’t create the account.'))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link to="/" className="flex items-center justify-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">Q</span>
-          </div>
-        </Link>
-        <h2 className="mt-6 text-center text-3xl font-bold text-white">
-          Create your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-400">
-          Already have an account?{' '}
-          <Link to="/login" className="font-medium text-primary-400 hover:text-primary-300">
-            Sign in
-          </Link>
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-gray-800 py-8 px-4 shadow-lg sm:rounded-xl sm:px-10 border border-gray-700">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="displayName" className="label text-gray-200">
-                Display name (optional)
-              </label>
-              <input
-                id="displayName"
-                name="displayName"
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                placeholder="John Doe"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="label text-gray-200">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="label text-gray-200">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                placeholder="••••••••"
-              />
-              <p className="mt-1 text-sm text-gray-400">
-                At least 8 characters, with uppercase, lowercase, and a number
-              </p>
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="label text-gray-200">
-                Confirm password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-primary w-full"
-              >
-                {loading ? 'Creating account...' : 'Create account'}
-              </button>
-            </div>
-          </form>
-
-          <p className="mt-6 text-center text-xs text-gray-400">
-            By creating an account, you agree to our{' '}
-            <a href="#" className="text-primary-400 hover:text-primary-300">
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a href="#" className="text-primary-400 hover:text-primary-300">
-              Privacy Policy
-            </a>
+    <AuthShell>
+      <form className="auth__form" onSubmit={submit} noValidate>
+        <Link to="/" className="lg:hidden" aria-label="Quizzr home"><Brand /></Link>
+        <div>
+          <h1>Create your account</h1>
+          <p className="muted" style={{ marginTop: 8 }}>
+            Already have one? <Link to="/login" className="link">Sign in</Link>
           </p>
         </div>
-      </div>
-    </div>
+        {formError && <div className="notice notice--error" role="alert"><ExclamationCircleIcon aria-hidden="true" />{formError}</div>}
+        <Field label="Name" htmlFor="name" error={errors.name}>
+          <input id="name" name="name" autoComplete="name" className="input" value={name} onChange={(e) => setName(e.target.value)} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'name-error' : undefined} />
+        </Field>
+        <Field label="Email" htmlFor="email" error={errors.email}>
+          <input id="email" name="email" type="email" autoComplete="email" inputMode="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-error' : undefined} />
+        </Field>
+        <Field label="Password" htmlFor="password" error={errors.password} help="At least 8 characters.">
+          <input id="password" name="password" type="password" autoComplete="new-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-error' : undefined} />
+        </Field>
+        <Button type="submit" variant="primary" size="lg" block loading={loading}>Create account</Button>
+      </form>
+    </AuthShell>
   )
 }

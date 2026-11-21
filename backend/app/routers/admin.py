@@ -34,16 +34,16 @@ async def get_system_stats(
     total_users = (await session.execute(select(func.count(User.id)))).scalar()
     active_users = (await session.execute(
         select(func.count(User.id)).where(
-            User.last_active_at >= datetime.utcnow() - timedelta(days=7)
+            User.last_login >= datetime.utcnow() - timedelta(days=7)
         )
     )).scalar()
     
-    premium_users = (await session.execute(
-        select(func.count(User.id)).where(User.role == UserRole.PREMIUM)
+    admin_users = (await session.execute(
+        select(func.count(User.id)).where(User.role == UserRole.ADMIN)
     )).scalar()
     
     guest_users = (await session.execute(
-        select(func.count(User.id)).where(User.is_guest == True)
+        select(func.count(User.id)).where(User.role == UserRole.GUEST)
     )).scalar()
     
     # Content stats
@@ -74,7 +74,7 @@ async def get_system_stats(
         "users": {
             "total": total_users,
             "active_7d": active_users,
-            "premium": premium_users,
+            "admins": admin_users,
             "guests": guest_users
         },
         "content": {
@@ -259,24 +259,18 @@ async def retry_job(
     # Reset job status
     job.status = JobStatus.PENDING
     job.error_message = None
+    job.progress = 0
+    job.completed_at = None
     job.retry_count += 1
-    job.updated_at = datetime.utcnow()
-    
     await session.commit()
-    
-    # Re-queue the task based on job type
-    from app.tasks import process_document_task, generate_deck_task, generate_quiz_task
-    from app.models.job import JobType
-    
-    if job.job_type == JobType.DOCUMENT_PROCESSING:
-        document_id = job.metadata.get("document_id")
-        if document_id:
-            process_document_task.delay(job.id)
-    elif job.job_type == JobType.DECK_GENERATION:
-        generate_deck_task.delay(job.id, job.metadata)
-    elif job.job_type == JobType.QUIZ_GENERATION:
-        generate_quiz_task.delay(job.id, job.metadata)
-    
+
+    from app.services import jobs
+
+    runner = jobs.RUNNERS.get(job.job_type)
+    if runner is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This job type cannot be retried")
+    await jobs.schedule(runner, job.id)
+
     return {"message": "Job queued for retry"}
 
 

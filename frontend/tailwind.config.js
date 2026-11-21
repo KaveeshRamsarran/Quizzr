@@ -1,64 +1,29 @@
 /** @type {import('tailwindcss').Config} */
+// Layout utilities only; every colour and face comes from the Ultraviolet tokens in src/styles/tokens.css.
 export default {
   darkMode: 'class',
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  // Component classes whose modifier is built at runtime (btn--${variant}, rating--${value}).
+  safelist: [{ pattern: /^(btn|rating|badge|notice|card|icon-tile|progress)--/ }],
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
-        },
-        success: {
-          50: '#f0fdf4',
-          500: '#22c55e',
-          600: '#16a34a',
-        },
-        warning: {
-          50: '#fffbeb',
-          500: '#f59e0b',
-          600: '#d97706',
-        },
-        danger: {
-          50: '#fef2f2',
-          500: '#ef4444',
-          600: '#dc2626',
-        },
+        paper: 'var(--color-paper)',
+        'paper-2': 'var(--color-paper-2)',
+        'paper-3': 'var(--color-paper-3)',
+        ink: 'var(--color-ink)',
+        'ink-2': 'var(--color-ink-2)',
+        muted: 'var(--color-muted)',
+        rule: 'var(--color-rule)',
+        'rule-2': 'var(--color-rule-2)',
+        accent: 'var(--color-accent)',
+        error: 'var(--color-error)',
+        success: 'var(--color-success)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-      },
-      animation: {
-        'fade-in': 'fadeIn 0.3s ease-out',
-        'slide-up': 'slideUp 0.3s ease-out',
-        'flip': 'flip 0.6s ease-in-out',
-      },
-      keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%': { transform: 'translateY(10px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
-        },
-        flip: {
-          '0%': { transform: 'rotateY(0deg)' },
-          '50%': { transform: 'rotateY(90deg)' },
-          '100%': { transform: 'rotateY(180deg)' },
-        },
+        display: 'var(--font-display)',
+        body: 'var(--font-body)',
+        mono: 'var(--font-outlier)',
       },
     },
   },
