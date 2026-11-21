@@ -448,7 +448,7 @@ class QuizService:
             "question_id": question_id,
             "is_correct": is_correct,
             "points_earned": points,
-            "correct_answer": question.correct_answer if quiz.show_explanations else None,
+            "correct_answer": question.correct_answer,
             "explanation": question.explanation if quiz.show_explanations else None
         }
     

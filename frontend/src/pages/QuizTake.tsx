@@ -312,7 +312,11 @@ export default function QuizTake() {
               {isChoice ? (
                 <Stagger className="options">
                   {question.options!.map((o, i) => {
-                    const state = result ? (o.id === result.correct_answer ? 'correct' : o.id === result.given ? 'wrong' : undefined) : undefined
+                    // Your pick is green when the server says it was right; otherwise red, with the right option in green.
+                    const state = !result ? undefined
+                      : o.id === result.given ? (result.is_correct ? 'correct' : 'wrong')
+                      : !result.is_correct && o.id === result.correct_answer ? 'correct'
+                      : undefined
                     return (
                       <Item key={o.id}>
                         <motion.button

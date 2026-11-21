@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { CheckCircleIcon, ExclamationCircleIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import { ExclamationCircleIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import { errorMessage, generationApi } from '../lib/api'
 import { Button, Dialog, Field, Segmented } from './ui'
 import { EASE_OUT, ProgressBar } from './motion'
@@ -61,13 +61,29 @@ export default function GenerateDialog({
   })
   const current = status.data ?? job
 
+  const announced = useRef<number | null>(null)
   useEffect(() => {
-    if (current?.status === 'completed') {
-      queryClient.invalidateQueries({ queryKey: [kind === 'deck' ? 'decks' : 'quizzes'] })
-      queryClient.invalidateQueries({ queryKey: ['analytics'] })
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
-    }
-  }, [current?.status, kind, queryClient])
+    if (current?.status !== 'completed' || !current.result_id || announced.current === current.job_id) return
+    announced.current = current.job_id
+    queryClient.invalidateQueries({ queryKey: [kind === 'deck' ? 'decks' : 'quizzes'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
+    queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    const to = kind === 'deck' ? `/decks/${current.result_id}` : `/quizzes/${current.result_id}`
+    onClose()
+    toast.success((t) => (
+      <span className="flex items-center gap-3">
+        {kind === 'deck' ? 'Your flashcards are ready.' : 'Your quiz is ready.'}
+        <button
+          type="button"
+          className="link"
+          style={{ color: 'inherit', textDecoration: 'underline' }}
+          onClick={() => { toast.dismiss(t.id); navigate(to) }}
+        >
+          {kind === 'deck' ? 'Open deck' : 'Open quiz'}
+        </button>
+      </span>
+    ), { duration: 6000 })
+  }, [current, kind, queryClient, navigate, onClose])
 
   const start = useMutation({
     mutationFn: () => {
@@ -102,10 +118,10 @@ export default function GenerateDialog({
 
   return (
     <Dialog open={open} onClose={onClose} title={kind === 'deck' ? 'Make flashcards' : 'Make a quiz'}>
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence initial={false}>
         {step === 'form' && (
           <motion.form key="form" onSubmit={(e) => { e.preventDefault(); if (typesChosen) start.mutate() }} className="grid gap-5"
-            initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.22, ease: EASE_OUT }}>
+            initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: EASE_OUT }}>
             <p className="muted small" style={{ marginTop: -8 }}>
               From “{documentTitle}”. Ready in a few seconds.
             </p>
@@ -182,7 +198,7 @@ export default function GenerateDialog({
         )}
 
         {step === 'running' && current && (
-          <motion.div key="running" aria-live="polite" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: EASE_OUT }}>
+          <motion.div key="running" aria-live="polite" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: EASE_OUT }}>
             <div className="grid justify-items-center text-center gap-3" style={{ padding: '12px 0 4px' }}>
               <motion.div className="empty__icon" animate={{ rotate: [0, 8, -8, 0], scale: [1, 1.05, 1] }} transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}>
                 <SparklesIcon />
@@ -194,31 +210,6 @@ export default function GenerateDialog({
             <div className="dialog__actions">
               <Button variant="ghost" onClick={async () => { await generationApi.cancel(current.job_id).catch(() => undefined); onClose() }}>Cancel</Button>
               <Button onClick={onClose}>Keep going in the background</Button>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 'completed' && current?.result_id && (
-          <motion.div key="done" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 320, damping: 24 }}>
-            <div className="grid justify-items-center text-center gap-3" style={{ padding: '12px 0 4px' }}>
-              <motion.div initial={{ scale: 0, rotate: -60 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 420, damping: 14, delay: 0.05 }}>
-                <CheckCircleIcon style={{ width: 64, height: 64, color: 'var(--color-success)' }} aria-hidden="true" />
-              </motion.div>
-              <h3>{kind === 'deck' ? 'Your flashcards are ready' : 'Your quiz is ready'}</h3>
-              <p className="muted small">Every item links back to the page it came from.</p>
-            </div>
-            <div className="dialog__actions" style={{ justifyContent: 'center' }}>
-              {kind === 'deck' ? (
-                <>
-                  <Button onClick={() => navigate(`/decks/${current.result_id}`)}>See the cards</Button>
-                  <Button variant="primary" onClick={() => navigate(`/decks/${current.result_id}/study`)}>Start studying</Button>
-                </>
-              ) : (
-                <>
-                  <Button onClick={() => navigate(`/quizzes/${current.result_id}`)}>See the questions</Button>
-                  <Button variant="primary" onClick={() => navigate(`/quizzes/${current.result_id}/take`)}>Take the quiz</Button>
-                </>
-              )}
             </div>
           </motion.div>
         )}

@@ -450,11 +450,15 @@ async def submit_answer(
     if not result:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to submit answer",
+            detail="That question was already answered or isn't part of this quiz.",
         )
+    await session.commit()
 
+    # The client needs the correct option to mark it (and to explain a wrong answer).
     return {
         "is_correct": result.get("is_correct", False),
+        "correct_answer": result.get("correct_answer"),
+        "explanation": result.get("explanation"),
         "feedback": result.get("explanation") or result.get("correct_answer"),
     }
 

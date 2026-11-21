@@ -121,7 +121,10 @@ async def test_upload_generate_study_and_quiz(client: AsyncClient, authenticated
     attempt = (await client.post(f"/api/v1/quizzes/{quiz['id']}/attempts", headers=h)).json()
     for q in quiz["questions"]:
         r = await client.post(f"/api/v1/quizzes/{quiz['id']}/attempts/{attempt['id']}/answers", json={"question_id": q["id"], "answer": q["correct_answer"]}, headers=h)
-        assert r.json()["is_correct"], q
+        body = r.json()
+        assert body["is_correct"], q
+        # The client marks the right option from this, so it must always be sent.
+        assert body["correct_answer"] == q["correct_answer"], body
     result = (await client.post(f"/api/v1/quizzes/{quiz['id']}/attempts/{attempt['id']}/finish", headers=h)).json()
     assert result["percentage"] == 100 and result["passed"]
 
