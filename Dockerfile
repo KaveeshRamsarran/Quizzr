@@ -16,5 +16,7 @@ COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt pdf2image pytesseract
 COPY backend/ ./
 COPY --from=web /web/dist /app/frontend/dist
+ENV PORT=8002 PYTHONUNBUFFERED=1
 EXPOSE 8002
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
+# Render (and most hosts) pass the port to listen on in $PORT.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]
