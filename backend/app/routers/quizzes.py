@@ -60,6 +60,7 @@ async def create_quiz(
 @router.get("/", response_model=QuizListResponse)
 async def list_quizzes(
     course_id: Optional[int] = None,
+    document_id: Optional[int] = None,
     search: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
@@ -70,6 +71,8 @@ async def list_quizzes(
     List user's quizzes
     """
     query = select(Quiz).where(Quiz.user_id == current_user.id)
+    if document_id:
+        query = query.where(Quiz.source_document_id == document_id)
     
     if course_id:
         query = query.where(Quiz.course_id == course_id)
@@ -82,6 +85,12 @@ async def list_quizzes(
     
     # Get total count
     count_query = select(func.count(Quiz.id)).where(Quiz.user_id == current_user.id)
+    if document_id:
+        count_query = count_query.where(Quiz.source_document_id == document_id)
+    if search:
+        count_query = count_query.where(
+            Quiz.name.ilike(f"%{search}%") | Quiz.description.ilike(f"%{search}%")
+        )
     if course_id:
         count_query = count_query.where(Quiz.course_id == course_id)
     
@@ -326,6 +335,12 @@ async def start_quiz_attempt(
         )
     
     attempt = await quiz_service.start_attempt(quiz_id, current_user.id)
+    if not attempt:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This quiz has no questions yet."
+        )
+    await session.commit()
     return QuizAttemptResponse.model_validate(attempt)
 
 
@@ -491,6 +506,9 @@ async def finish_attempt(
     
     # Complete attempt
     results = await quiz_service.finish_attempt(attempt_id, current_user.id)
+    if results:
+        from app.services.analytics import AnalyticsService
+        current_user.total_study_time_minutes = await AnalyticsService(session).total_study_minutes(current_user.id)
     if not results:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -501,7 +519,7 @@ async def finish_attempt(
     
     # Ensure legacy fields expected by tests exist
     raw_score = float(results.get("score", 0) or 0) if isinstance(results, dict) else 0.0
-    percentage = int(round(raw_score * 100)) if raw_score <= 1 else int(round(raw_score))
+    percentage = int(round(raw_score))
     passed = bool(percentage >= getattr(quiz, "pass_percentage", 70))
     if isinstance(results, dict):
         results.setdefault("completed", True)

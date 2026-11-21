@@ -1,137 +1,75 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../stores/authStore'
-import { authApi } from '../lib/api'
+import { useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { ExclamationCircleIcon } from '@heroicons/react/24/outline'
+import { authApi, errorMessage } from '../lib/api'
+import { useAuthStore } from '../stores/authStore'
+import { Brand, Button, Field } from '../components/ui'
+import AuthShell from './AuthShell'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login } = useAuthStore()
+  const location = useLocation()
+  const login = useAuthStore((s) => s.login)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [guestLoading, setGuestLoading] = useState(false)
+  const next = (location.state as { from?: string } | null)?.from || '/dashboard'
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
+    setError(null)
     setLoading(true)
-
     try {
-      const response = await authApi.login(email, password)
-      login(response.user, response.access_token, response.refresh_token)
-      toast.success('Welcome back!')
-      navigate('/dashboard')
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Login failed')
+      const data = await authApi.login(email.trim(), password)
+      login(data.user, data.access_token, data.refresh_token)
+      navigate(next, { replace: true })
+    } catch (err) {
+      setError(errorMessage(err, 'Couldn’t sign in.'))
+      document.getElementById('password')?.focus()
     } finally {
       setLoading(false)
     }
   }
 
-  const handleGuestLogin = async () => {
-    setLoading(true)
-
+  const guest = async () => {
+    setGuestLoading(true)
     try {
-      const response = await authApi.loginAsGuest()
-      login(response.user, response.access_token, response.refresh_token)
-      toast.success('Welcome! You are logged in as a guest.')
-      navigate('/dashboard')
-    } catch {
-      toast.error('Could not create guest account')
+      const data = await authApi.loginAsGuest()
+      login(data.user, data.access_token, data.refresh_token)
+      navigate('/upload', { replace: true })
+    } catch (err) {
+      toast.error(errorMessage(err))
     } finally {
-      setLoading(false)
+      setGuestLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link to="/" className="flex items-center justify-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">Q</span>
-          </div>
-        </Link>
-        <h2 className="mt-6 text-center text-3xl font-bold text-white">
-          Sign in to Quizzr
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-400">
-          Or{' '}
-          <Link to="/register" className="font-medium text-primary-400 hover:text-primary-300">
-            create a new account
-          </Link>
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-gray-800 py-8 px-4 shadow-lg sm:rounded-xl sm:px-10 border border-gray-700">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="label text-gray-200">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="label text-gray-200">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-primary w-full"
-              >
-                {loading ? 'Signing in...' : 'Sign in'}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-600" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="bg-gray-800 px-2 text-gray-400">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <button
-                onClick={handleGuestLogin}
-                disabled={loading}
-                className="btn-secondary w-full bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
-              >
-                Try as Guest
-              </button>
-            </div>
-          </div>
+    <AuthShell>
+      <form className="auth__form" onSubmit={submit} noValidate>
+        <Link to="/" className="lg:hidden" aria-label="Quizzr home"><Brand /></Link>
+        <div>
+          <h1>Welcome back</h1>
+          <p className="muted" style={{ marginTop: 8 }}>
+            New to Quizzr? <Link to="/register" className="link">Create an account</Link>
+          </p>
         </div>
-      </div>
-    </div>
+        {error && <div className="notice notice--error" role="alert"><ExclamationCircleIcon aria-hidden="true" />{error}</div>}
+        <Field label="Email" htmlFor="email">
+          <input id="email" name="email" type="email" autoComplete="email" inputMode="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </Field>
+        <Field label="Password" htmlFor="password">
+          <input id="password" name="password" type="password" autoComplete="current-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={!!error} required />
+        </Field>
+        <Button type="submit" variant="primary" size="lg" block loading={loading} disabled={!email || !password}>Sign in</Button>
+        <div className="flex items-center gap-3 muted small" aria-hidden="true">
+          <span className="flex-1" style={{ borderTop: '1px solid var(--color-rule)' }} />or<span className="flex-1" style={{ borderTop: '1px solid var(--color-rule)' }} />
+        </div>
+        <Button size="lg" block onClick={guest} loading={guestLoading}>Continue as a guest</Button>
+      </form>
+    </AuthShell>
   )
 }

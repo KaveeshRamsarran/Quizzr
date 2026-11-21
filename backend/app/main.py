@@ -6,7 +6,8 @@ Entry point for the Quizzr API
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from pathlib import Path
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -15,6 +16,8 @@ import os
 
 from app.config import settings
 from app.database import engine, Base
+import app.models  # noqa: F401  (register every table before create_all)
+from app.services import jobs
 from app.routers import auth, documents, generation, decks, quizzes, analytics, admin
 
 
@@ -57,11 +60,14 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     
     logger.info("Database tables created/verified")
-    
+
+    await jobs.recover_interrupted_jobs()
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Quizzr API")
+    await jobs.wait_for_all()
     await engine.dispose()
 
 
@@ -71,8 +77,8 @@ app = FastAPI(
     description="AI-powered flashcard and quiz generation from PDF documents",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs" if settings.debug else None,
-    redoc_url="/redoc" if settings.debug else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # Add rate limiting
@@ -138,18 +144,6 @@ async def health_check():
     }
 
 
-# Root endpoint
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint with API info"""
-    return {
-        "app": "Quizzr API",
-        "version": "1.0.0",
-        "description": "AI-powered flashcard and quiz generation",
-        "docs": "/docs" if settings.debug else "Disabled in production",
-    }
-
-
 # Include routers
 API_V1_PREFIX = "/api/v1"
 
@@ -160,3 +154,22 @@ app.include_router(decks.router, prefix=f"{API_V1_PREFIX}/decks", tags=["Decks"]
 app.include_router(quizzes.router, prefix=f"{API_V1_PREFIX}/quizzes", tags=["Quizzes"])
 app.include_router(analytics.router, prefix=f"{API_V1_PREFIX}/analytics", tags=["Analytics"])
 app.include_router(admin.router, prefix=f"{API_V1_PREFIX}/admin", tags=["Admin"])
+
+
+# Serve the built frontend (frontend/dist) when it exists, so one process runs the whole app.
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+if FRONTEND_DIST.is_dir():
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa(full_path: str):
+        if full_path.startswith(("api/", "docs", "redoc", "openapi.json", "health")):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        candidate = (FRONTEND_DIST / full_path).resolve()
+        if full_path and candidate.is_file() and FRONTEND_DIST in candidate.parents:
+            return FileResponse(candidate)
+        return FileResponse(FRONTEND_DIST / "index.html")
+else:
+    @app.get("/", tags=["Root"])
+    async def root():
+        """API info (the frontend is served by Vite in development)."""
+        return {"app": "Quizzr API", "version": "1.0.0", "docs": "/docs"}

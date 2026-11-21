@@ -1,148 +1,119 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  DocumentIcon,
-  TrashIcon,
-  PlusIcon,
-  ArrowPathIcon,
-} from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
-import clsx from 'clsx'
-import { documentsApi } from '../lib/api'
+import { ArrowUpTrayIcon, DocumentTextIcon, MagnifyingGlassIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { documentsApi, errorMessage } from '../lib/api'
+import { fileSize, relativeDate } from '../lib/format'
+import { Button, ConfirmDialog, EmptyState, ErrorState, PageHeader, SkeletonRows, StatusBadge } from '../components/ui'
+import { Item, Page, Stagger } from '../components/motion'
+import type { Document } from '../types'
+import SearchBox from '../components/SearchBox'
+
+const PAGE_SIZE = 20
 
 export default function Documents() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [params, setParams] = useSearchParams()
+  const search = params.get('q') ?? ''
+  const page = Number(params.get('page') ?? 1)
+  const [draft, setDraft] = useState(search)
+  const [toDelete, setToDelete] = useState<Document | null>(null)
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['documents', { page: 1, limit: 50 }],
-    queryFn: () => documentsApi.list({ page: 1, limit: 50 }),
-    retry: false,
-    staleTime: 15000,
+  const query = useQuery({
+    queryKey: ['documents', 'list', { search, page }],
+    queryFn: () => documentsApi.list({ search: search || undefined, page, limit: PAGE_SIZE }),
+    refetchInterval: (q) => (q.state.data?.documents.some((d) => d.status === 'pending' || d.status === 'processing') ? 2000 : false),
   })
 
-  const deleteMutation = useMutation({
+  const remove = useMutation({
     mutationFn: (id: number) => documentsApi.delete(id),
-    onSuccess: async () => {
+    onSuccess: () => {
       toast.success('Document deleted')
-      await queryClient.invalidateQueries({ queryKey: ['documents'] })
+      setToDelete(null)
+      queryClient.invalidateQueries({ queryKey: ['documents'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics'] })
     },
-    onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Failed to delete document')
-    },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
-  const handleDelete = (id: number, title: string) => {
-    if (deleteMutation.isPending) return
-    const ok = window.confirm(`Delete "${title}"? This cannot be undone.`)
-    if (!ok) return
-    deleteMutation.mutate(id)
+  const setQuery = (next: Record<string, string | null>) => {
+    const p = new URLSearchParams(params)
+    Object.entries(next).forEach(([k, v]) => (v ? p.set(k, v) : p.delete(k)))
+    setParams(p, { replace: true })
   }
 
-  const documents = data?.documents ?? []
+  const data = query.data
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Documents</h1>
-          <p className="text-gray-400 text-sm">
-            {data ? `${data.total} total` : 'Your uploaded PDFs'}
-          </p>
-        </div>
+    <Page>
+      <PageHeader
+        title="Documents"
+        sub={data ? `${data.total} ${data.total === 1 ? 'document' : 'documents'} uploaded` : 'Your uploaded PDFs'}
+        actions={<Link to="/upload" className="btn btn--primary"><ArrowUpTrayIcon aria-hidden="true" /> Upload a PDF</Link>}
+      />
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['documents'] })}
-            className="btn-secondary bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
-            disabled={isLoading}
-          >
-            <ArrowPathIcon className="w-5 h-5 mr-2" />
-            Refresh
-          </button>
-          <Link to="/upload" className="btn-primary">
-            <PlusIcon className="w-5 h-5 mr-2" />
-            Upload
-          </Link>
-        </div>
-      </div>
+      {(data?.total || search) ? (
+        <SearchBox id="doc-search" label="Search documents" value={draft} onChange={setDraft} onSubmit={() => setQuery({ q: draft.trim() || null, page: null })} />
+      ) : null}
 
-      <div className="card bg-gray-800 border-gray-700">
-        <div className="p-4 border-b border-gray-700">
-          <h2 className="font-semibold text-white">All Documents</h2>
+      {query.isLoading ? (
+        <SkeletonRows rows={5} />
+      ) : query.isError ? (
+        <ErrorState message={errorMessage(query.error)} onRetry={() => query.refetch()} />
+      ) : !data?.documents.length ? (
+        <div className="card">
+          {search ? (
+            <EmptyState icon={<MagnifyingGlassIcon />} title={`Nothing matches “${search}”`} action={<Button onClick={() => { setDraft(''); setQuery({ q: null }) }}>Clear search</Button>} />
+          ) : (
+            <EmptyState icon={<DocumentTextIcon />} title="No documents yet" action={<Link to="/upload" className="btn btn--primary"><ArrowUpTrayIcon aria-hidden="true" /> Upload a PDF</Link>}>
+              Upload a lecture PDF to make flashcards and quizzes from it.
+            </EmptyState>
+          )}
         </div>
-
-        {isLoading ? (
-          <div className="p-8 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-          </div>
-        ) : isError ? (
-          <div className="p-8 text-center text-gray-400">
-            Failed to load documents.
-          </div>
-        ) : documents.length === 0 ? (
-          <div className="p-10 text-center text-gray-400">
-            <DocumentIcon className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-            <p className="font-medium text-white">No documents yet</p>
-            <p className="text-sm">Upload your first PDF to get started.</p>
-            <Link to="/upload" className="btn-primary mt-4 inline-flex">
-              <PlusIcon className="w-5 h-5 mr-2" />
-              Upload Document
-            </Link>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-700">
-            {documents.map((doc) => (
-              <div key={doc.id} className="flex items-center p-4 gap-3">
-                <button
-                  onClick={() => navigate(`/documents/${doc.id}`)}
-                  className="flex items-center gap-3 min-w-0 flex-1 text-left"
-                >
-                  <DocumentIcon className="w-10 h-10 text-gray-500 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-white truncate">
-                      {doc.title || doc.filename}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {doc.page_count ?? '—'} pages • {doc.status} •{' '}
-                      {new Date(doc.created_at).toLocaleDateString()}
-                    </p>
+      ) : (
+        <>
+          <Stagger className="card list" key={`${search}-${page}`}>
+            {data.documents.map((doc) => (
+              <Item key={doc.id} className="list-row list-row--link" onClick={() => navigate(`/documents/${doc.id}`)}>
+                <div className="icon-tile"><DocumentTextIcon aria-hidden="true" /></div>
+                <div className="min-w-0 flex-1">
+                  <Link to={`/documents/${doc.id}`} className="row-title truncate block" onClick={(e) => e.stopPropagation()}>{doc.title || doc.original_filename}</Link>
+                  <div className="row-meta truncate">
+                    {doc.page_count ? `${doc.page_count} ${doc.page_count === 1 ? 'page' : 'pages'}, ` : ''}{fileSize(doc.file_size)}, uploaded {relativeDate(doc.created_at)}
                   </div>
-                </button>
-
-                <span
-                  className={clsx(
-                    'px-2 py-1 rounded-full text-xs font-medium shrink-0',
-                    doc.status === 'processed'
-                      ? 'bg-green-900 text-green-300'
-                      : doc.status === 'processing'
-                        ? 'bg-blue-900 text-blue-300'
-                        : doc.status === 'pending'
-                          ? 'bg-yellow-900 text-yellow-300'
-                          : 'bg-red-900 text-red-300'
-                  )}
-                >
-                  {doc.status}
-                </span>
-
-                <button
-                  onClick={() => handleDelete(doc.id, doc.title || doc.filename)}
-                  className="p-2 rounded-lg text-red-400 hover:bg-red-900/30 disabled:opacity-50"
-                  disabled={deleteMutation.isPending}
-                  title="Delete"
-                >
-                  <TrashIcon className="w-5 h-5" />
-                </button>
-              </div>
+                </div>
+                <StatusBadge status={doc.status} />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<TrashIcon aria-hidden="true" />}
+                  aria-label={`Delete ${doc.title || doc.original_filename}`}
+                  onClick={(e) => { e.stopPropagation(); setToDelete(doc) }}
+                />
+              </Item>
             ))}
-          </div>
-        )}
-      </div>
+          </Stagger>
+          {data.pages > 1 && (
+            <nav className="flex items-center justify-center gap-3" style={{ marginTop: 24 }} aria-label="Pages">
+              <Button size="sm" disabled={page <= 1} onClick={() => setQuery({ page: String(page - 1) })}>Previous</Button>
+              <span className="muted small">Page {page} of {data.pages}</span>
+              <Button size="sm" disabled={page >= data.pages} onClick={() => setQuery({ page: String(page + 1) })}>Next</Button>
+            </nav>
+          )}
+        </>
+      )}
 
-      <p className="text-xs text-gray-500">
-        Showing up to 50 most recent documents.
-      </p>
-    </div>
+      <ConfirmDialog
+        open={!!toDelete}
+        title="Delete this document?"
+        body={<>“{toDelete?.title || toDelete?.original_filename}” will be deleted. Flashcards and quizzes made from it are kept.</>}
+        confirmLabel="Delete document"
+        loading={remove.isPending}
+        onConfirm={() => toDelete && remove.mutate(toDelete.id)}
+        onClose={() => setToDelete(null)}
+      />
+    </Page>
   )
 }

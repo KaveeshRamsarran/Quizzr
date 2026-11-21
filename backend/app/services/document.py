@@ -132,8 +132,6 @@ class DocumentService:
             status=JobStatus.PENDING,
             document_id=document.id,
             parameters={
-                "ocr_enabled": settings.ocr_enabled,
-                "ocr_threshold": settings.ocr_text_threshold
             }
         )
         

@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.database import Base, get_db
 from app.config import settings
+from app.services import jobs
 
 # Test database URL (SQLite for testing)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -27,12 +28,13 @@ TestSessionLocal = async_sessionmaker(
 )
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+# Uploaded files go to a throwaway folder.
+import tempfile
+settings.upload_dir = tempfile.mkdtemp(prefix="quizzr-test-uploads-")
+
+# Background jobs run inline against the test database.
+jobs.session_factory = TestSessionLocal
+jobs.run_inline = True
 
 
 @pytest_asyncio.fixture(scope="function")

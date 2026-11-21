@@ -1,23 +1,40 @@
 @echo off
-echo Starting Quizzr Backend and Frontend...
+setlocal
+cd /d "%~dp0"
+echo Starting Quizzr...
 echo.
 
-REM Start backend in new window
-start "Quizzr Backend" cmd /k "cd /d %~dp0backend && ..\llama-stack-venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8002"
+REM ---- Backend: create the virtual environment on first run ----
+if not exist "backend\.venv\Scripts\python.exe" (
+  echo Setting up the Python environment ^(first run only^)...
+  py -3 -m venv backend\.venv || python -m venv backend\.venv
+  backend\.venv\Scripts\python.exe -m pip install --upgrade pip >nul
+  backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt || goto :error
+)
 
-REM Wait a bit for backend to start
+REM ---- Frontend: install packages on first run ----
+if not exist "frontend\node_modules" (
+  echo Installing frontend packages ^(first run only^)...
+  pushd frontend
+  call npm install || goto :error
+  popd
+)
+
+start "Quizzr API" cmd /k "cd /d %~dp0backend && .venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8002"
 timeout /t 3 /nobreak > nul
-
-REM Start frontend in new window
-start "Quizzr Frontend" cmd /k "cd /d %~dp0frontend && node node_modules\vite\bin\vite.js"
+start "Quizzr Web" cmd /k "cd /d %~dp0frontend && npx vite --port 3000"
+timeout /t 4 /nobreak > nul
+start "" http://localhost:3000
 
 echo.
-echo ========================================
-echo Quizzr servers are starting...
-echo ========================================
-echo Backend: http://127.0.0.1:8002
-echo Frontend: http://localhost:3000
-echo ========================================
+echo   App:       http://localhost:3000
+echo   API docs:  http://127.0.0.1:8002/docs
 echo.
-echo Press any key to exit this window (servers will keep running)
-pause > nul
+echo Close the two server windows to stop Quizzr.
+exit /b 0
+
+:error
+echo.
+echo Setup failed. See the messages above.
+pause
+exit /b 1

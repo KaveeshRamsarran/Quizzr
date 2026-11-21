@@ -1,262 +1,202 @@
-import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import {
-  DocumentArrowUpIcon,
-  SparklesIcon,
-  AcademicCapIcon,
-  ChartBarIcon,
-  CheckCircleIcon,
-  ArrowRightIcon,
-} from '@heroicons/react/24/outline'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import toast from 'react-hot-toast'
+import { ArrowPathIcon, ArrowRightIcon, ArrowUpTrayIcon, CheckIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import { authApi, errorMessage } from '../lib/api'
+import { useAuthStore } from '../stores/authStore'
+import { Brand, Button } from '../components/ui'
+import { EASE_OUT, Reveal } from '../components/motion'
+import FlipCard from '../components/FlipCard'
 
-const features = [
-  {
-    name: 'Upload PDFs',
-    description: 'Simply upload your lecture notes, slides, or textbook chapters.',
-    icon: DocumentArrowUpIcon,
-  },
-  {
-    name: 'AI Generation',
-    description: 'Our AI extracts key concepts and creates flashcards & quizzes.',
-    icon: SparklesIcon,
-  },
-  {
-    name: 'Smart Study',
-    description: 'Spaced repetition ensures you remember what you learn.',
-    icon: AcademicCapIcon,
-  },
-  {
-    name: 'Track Progress',
-    description: 'See your improvement with detailed analytics and insights.',
-    icon: ChartBarIcon,
-  },
+// Real output of the built-in generator on a page of sample cell-biology notes.
+const SAMPLE = [
+  { front: 'What is osmosis?', back: 'The diffusion of water across a selectively permeable membrane.', type: 'Definition', page: 1 },
+  { front: 'Active transport requires energy in the form of _____ because it moves substances against their gradient.', back: 'ATP', type: 'Fill the gap', page: 1 },
+  { front: 'What are ribosomes?', back: 'The sites of protein synthesis in all living cells.', type: 'Definition', page: 2 },
 ]
 
-const benefits = [
-  'AI-powered flashcard generation from any PDF',
-  'Multiple question types: MCQ, True/False, Fill-in-the-blank',
-  'Spaced repetition for optimal retention',
-  'Source-grounded content - no hallucinations',
-  'Export to Anki and other formats',
-  'Works offline after initial sync',
-]
+// SM-2 intervals for a card you keep rating Good (starting ease 2.5).
+const GOOD_INTERVALS = [1, 6, 15, 38, 95]
+
+function DemoCard() {
+  const [index, setIndex] = useState(0)
+  const [flipped, setFlipped] = useState(false)
+  const card = SAMPLE[index]
+
+  const next = () => {
+    setFlipped(false)
+    setTimeout(() => setIndex((i) => (i + 1) % SAMPLE.length), flipped ? 180 : 0)
+  }
+
+  return (
+    <div className="demo">
+      <div className="demo__cards">
+      <motion.div className="demo__stack" style={{ rotate: -4, scale: 0.94, y: 18 }} aria-hidden="true" />
+      <motion.div className="demo__stack" style={{ rotate: 3, scale: 0.97, y: 9 }} aria-hidden="true" />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={index}
+          initial={{ opacity: 0, y: 30, rotate: -2 }}
+          animate={{ opacity: 1, y: 0, rotate: 0 }}
+          exit={{ opacity: 0, x: 80, rotate: 6, transition: { duration: 0.22 } }}
+          transition={{ duration: 0.5, ease: EASE_OUT }}
+          style={{ position: 'relative' }}
+        >
+          <FlipCard
+            flipped={flipped}
+            onFlip={() => setFlipped((f) => !f)}
+            label="Sample flashcard"
+            front={
+              <>
+                <span className="flip__meta"><span className="badge badge--accent">{card.type}</span><span className="tiny muted">Page {card.page}</span></span>
+                <span className="flip__text">{card.front}</span>
+                <span className="flip__hint">Tap the card to turn it over</span>
+              </>
+            }
+            back={
+              <>
+                <span className="flip__meta"><span className="badge badge--success"><CheckIcon /> Answer</span><span className="tiny muted">Page {card.page}</span></span>
+                <span className="flip__text flip__text--answer">{card.back}</span>
+                <span className="flip__hint">From cell-biology.pdf</span>
+              </>
+            }
+          />
+        </motion.div>
+      </AnimatePresence>
+      </div>
+      <div className="flex items-center justify-between" style={{ marginTop: 28 }}>
+        <span className="small muted figure-font">{index + 1} of {SAMPLE.length} sample cards</span>
+        <Button size="sm" onClick={next} icon={<ArrowRightIcon />}>Next card</Button>
+      </div>
+    </div>
+  )
+}
 
 export default function Landing() {
+  const { isAuthenticated, login } = useAuthStore()
+  const navigate = useNavigate()
+  const [guestLoading, setGuestLoading] = useState(false)
+
+  const tryAsGuest = async () => {
+    setGuestLoading(true)
+    try {
+      const data = await authApi.loginAsGuest()
+      login(data.user, data.access_token, data.refresh_token)
+      navigate('/upload')
+    } catch (error) {
+      toast.error(errorMessage(error))
+    } finally {
+      setGuestLoading(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
-      {/* Navigation */}
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">Q</span>
-            </div>
-            <span className="ml-3 text-2xl font-bold text-white">Quizzr</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              to="/login"
-              className="text-gray-300 hover:text-white font-medium"
-            >
-              Sign in
-            </Link>
-            <Link
-              to="/register"
-              className="btn-primary"
-            >
-              Get Started
-            </Link>
-          </div>
+    <div>
+      <header className="l-nav">
+        <div className="l-wrap l-nav__inner">
+          <Link to="/" aria-label="Quizzr home"><Brand /></Link>
+          <nav aria-label="Main">
+            <a href="#how" className="btn btn--ghost btn--sm hide-sm">How it works</a>
+            {isAuthenticated ? (
+              <Link to="/dashboard" className="btn btn--sm">Open Quizzr</Link>
+            ) : (
+              <>
+                <Link to="/login" className="btn btn--ghost btn--sm">Sign in</Link>
+                <Link to="/register" className="btn btn--sm">Create account</Link>
+              </>
+            )}
+          </nav>
         </div>
-      </nav>
+      </header>
 
-      {/* Hero */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-5xl md:text-6xl font-bold text-white tracking-tight"
-          >
-            Study Smarter with
-            <span className="text-primary-400"> AI-Powered</span>
-            <br />
-            Flashcards & Quizzes
-          </motion.h1>
-          
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="mt-6 text-xl text-gray-300 max-w-2xl mx-auto"
-          >
-            Upload your PDFs and let AI create personalized study materials.
-            Master any subject with spaced repetition and adaptive quizzes.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
-          >
-            <Link
-              to="/register"
-              className="btn-primary text-lg px-8 py-3"
-            >
-              Get Started
-              <ArrowRightIcon className="w-5 h-5 ml-2" />
-            </Link>
-            <Link
-              to="/login"
-              className="btn bg-gray-700 text-white border border-gray-600 hover:bg-gray-600 text-lg px-8 py-3"
-            >
-              Watch Demo
-            </Link>
-          </motion.div>
-        </div>
-
-        {/* Hero image placeholder */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="mt-16 relative"
-        >
-          <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-8 max-w-4xl mx-auto">
-            <div className="bg-gradient-to-br from-gray-700 to-gray-800 rounded-xl p-8 text-center border border-gray-600">
-              <DocumentArrowUpIcon className="w-16 h-16 mx-auto text-primary-400 mb-4" />
-              <p className="text-lg text-gray-200">
-                Drop your PDF here or click to upload
-              </p>
-              <p className="text-sm text-gray-400 mt-2">
-                Supports lecture notes, slides, textbooks up to 50MB
-              </p>
+      <main>
+        <section className="l-wrap hero" aria-labelledby="hero-title">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE_OUT }}>
+            <h1 id="hero-title">Study from your own notes.</h1>
+            <p className="hero__lead">Drop in a lecture PDF and get flashcards, quizzes and a review plan.</p>
+            <div className="hero__actions">
+              <Link to={isAuthenticated ? '/upload' : '/register'} className="btn btn--primary btn--lg">
+                <ArrowUpTrayIcon aria-hidden="true" /> Upload your first PDF
+              </Link>
+              {!isAuthenticated && <Button size="lg" onClick={tryAsGuest} loading={guestLoading}>Try it as a guest</Button>}
             </div>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* Features */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <h2 className="text-3xl font-bold text-center text-white mb-12">
-          How Quizzr Works
-        </h2>
-        
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {features.map((feature, index) => (
-            <motion.div
-              key={feature.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              viewport={{ once: true }}
-              className="text-center"
-            >
-              <div className="w-16 h-16 bg-primary-900/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <feature.icon className="w-8 h-8 text-primary-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                {feature.name}
-              </h3>
-              <p className="text-gray-400">
-                {feature.description}
-              </p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* Benefits */}
-      <section className="bg-gray-900 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-white mb-6">
-                Everything you need to ace your exams
-              </h2>
-              <p className="text-gray-400 text-lg mb-8">
-                Quizzr uses advanced AI to understand your study materials and create
-                the most effective learning experience possible.
-              </p>
-              
-              <ul className="space-y-4">
-                {benefits.map((benefit) => (
-                  <li key={benefit} className="flex items-start">
-                    <CheckCircleIcon className="w-6 h-6 text-primary-400 mr-3 flex-shrink-0" />
-                    <span className="text-gray-300">{benefit}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            
-            <div className="bg-gray-800 rounded-2xl p-8">
-              <div className="space-y-4">
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <p className="text-primary-400 text-sm font-medium mb-2">Flashcard</p>
-                  <p className="text-white font-medium">
-                    What is the mitochondria?
-                  </p>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <p className="text-success-500 text-sm font-medium mb-2">Answer</p>
-                  <p className="text-white">
-                    The mitochondria is the powerhouse of the cell, responsible for
-                    producing ATP through cellular respiration.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button className="flex-1 py-2 rounded-lg bg-danger-500 text-white text-sm font-medium">
-                    Again
-                  </button>
-                  <button className="flex-1 py-2 rounded-lg bg-warning-500 text-white text-sm font-medium">
-                    Hard
-                  </button>
-                  <button className="flex-1 py-2 rounded-lg bg-success-500 text-white text-sm font-medium">
-                    Good
-                  </button>
-                  <button className="flex-1 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium">
-                    Easy
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-        <h2 className="text-3xl font-bold text-white mb-4">
-          Ready to study smarter?
-        </h2>
-        <p className="text-xl text-gray-300 mb-8">
-          Join thousands of students who are acing their exams with Quizzr.
-        </p>
-        <Link
-          to="/register"
-          className="btn-primary text-lg px-8 py-3"
-        >
-          Get Started for Free
-          <ArrowRightIcon className="w-5 h-5 ml-2" />
-        </Link>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 border-t border-gray-700 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center mb-4 md:mb-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">Q</span>
-              </div>
-              <span className="ml-2 text-lg font-bold text-white">Quizzr</span>
-            </div>
-            <p className="text-gray-400 text-sm">
-              © {new Date().getFullYear()} Quizzr. All rights reserved.
+            <p className="small muted inline-flex items-center gap-2" style={{ marginTop: 20 }}>
+              <SparklesIcon aria-hidden="true" style={{ width: 18, height: 18, color: 'var(--color-accent-text)' }} /> Works offline, nothing to set up.
             </p>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 30, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}>
+            <DemoCard />
+          </motion.div>
+        </section>
+
+        <section id="how" className="l-section" aria-labelledby="how-title">
+          <div className="l-wrap">
+            <Reveal className="l-head">
+              <h2 id="how-title">From PDF to practice in a minute.</h2>
+              <p>Quizzr reads your notes, pulls out definitions and key facts, and keeps the page each one came from.</p>
+            </Reveal>
+            <div className="steps">
+              {([
+                [ArrowUpTrayIcon, 'Upload a PDF', 'Lecture notes, slides or a textbook chapter, up to 50 MB.'],
+                [SparklesIcon, 'Make a deck or a quiz', 'Definitions, fill-the-gap cards, multiple choice, true or false.'],
+                [ArrowPathIcon, 'Review what’s due', 'Rate each card. Quizzr decides when you see it next.'],
+              ] as const).map(([Icon, title, text], i) => (
+                <Reveal key={title} delay={i * 0.08} className="card step">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-tile"><Icon aria-hidden="true" /></div>
+                    <h3 style={{ marginTop: 0 }}>{title}</h3>
+                  </div>
+                  <p>{text}</p>
+                </Reveal>
+              ))}
+            </div>
           </div>
+        </section>
+
+        <section className="l-section" style={{ paddingTop: 0 }} aria-labelledby="schedule-title">
+          <div className="l-wrap">
+            <Reveal className="l-head">
+              <h2 id="schedule-title">Reviews that space themselves out.</h2>
+              <p>Know a card, and the gap before you see it again grows. Miss it, and it comes back tomorrow.</p>
+            </Reveal>
+            <div className="timeline">
+              {GOOD_INTERVALS.map((days, i) => (
+                <Reveal key={days} delay={i * 0.07} className="card timeline__item" >
+                  <div className="timeline__days">{days}</div>
+                  <div className="small muted" style={{ marginTop: 6 }}>{days === 1 ? 'day' : 'days'}, review {i + 1}</div>
+                </Reveal>
+              ))}
+            </div>
+            <p className="small muted" style={{ marginTop: 14 }}>Days until the next review when you rate a card Good each time.</p>
+          </div>
+        </section>
+
+        <section className="l-section" style={{ paddingTop: 0 }}>
+          <div className="l-wrap">
+            <Reveal className="violet-band">
+              <div className="grid gap-8 md:grid-cols-2 md:items-center">
+                <div>
+                  <h2>Bring tonight’s lecture.</h2>
+                  <p style={{ marginTop: 12, opacity: 0.85, maxWidth: '36ch' }}>
+                    Your decks export to CSV or straight into Anki, so nothing is locked in.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3 md:justify-end">
+                  <Link to={isAuthenticated ? '/upload' : '/register'} className="btn btn--light btn--lg">
+                    <ArrowUpTrayIcon aria-hidden="true" /> Upload a PDF
+                  </Link>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <div className="l-wrap flex flex-wrap items-center justify-between gap-3">
+          <Brand />
+          <span>Cards are written on your computer from your own notes. No API keys, nothing sent to the cloud.</span>
         </div>
       </footer>
     </div>

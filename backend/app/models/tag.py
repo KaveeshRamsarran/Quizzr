@@ -4,10 +4,15 @@ Tags for organizing cards and questions
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import String, DateTime, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:  # pragma: no cover
+    from app.models.deck import Card
+    from app.models.quiz import QuizQuestion
 
 
 class Tag(Base):

@@ -152,8 +152,9 @@ async def logout(
     Logout the current user
     Invalidates the current refresh token
     """
-    # In a production app, we would store the token in a blacklist
-    # For now, we just return success
+    current_user.refresh_token = None
+    current_user.refresh_token_expires = None
+    await session.commit()
     return {"message": "Logged out successfully"}
 
 
@@ -241,6 +242,31 @@ async def change_password(
     await session.commit()
     
     return {"message": "Password changed successfully"}
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_current_user(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Permanently delete the current account, its documents, decks, quizzes and history
+    """
+    import os
+    from sqlalchemy import select as _select
+    from app.models.document import Document
+
+    paths = (await session.execute(
+        _select(Document.file_path).where(Document.user_id == current_user.id)
+    )).scalars().all()
+    await session.delete(current_user)
+    await session.commit()
+    for path in paths:
+        try:
+            if path and os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
 
 
 @router.post("/convert-guest", response_model=TokenResponse)

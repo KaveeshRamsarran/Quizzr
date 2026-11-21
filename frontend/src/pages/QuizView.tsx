@@ -1,216 +1,143 @@
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  ClipboardDocumentListIcon,
-  ArrowLeftIcon,
-  PlayIcon,
-  TrashIcon,
-  ClockIcon,
-  TrophyIcon,
-} from '@heroicons/react/24/outline'
-import { quizzesApi } from '../lib/api'
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import clsx from 'clsx'
+import { ArrowLeftIcon, ChevronDownIcon, PlayIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { errorMessage, quizzesApi } from '../lib/api'
+import { QUESTION_TYPE_LABEL, duration, relativeDate } from '../lib/format'
+import { Button, ConfirmDialog, EmptyState, ErrorState, PageLoading, SectionTitle } from '../components/ui'
+import { CountUp, EASE_OUT, Item, Page, Stagger } from '../components/motion'
+import type { QuizQuestion } from '../types'
+
+function answerText(q: QuizQuestion) {
+  if (!q.correct_answer) return ''
+  if (q.options?.length) return q.options.find((o) => o.id === q.correct_answer)?.text ?? q.correct_answer
+  return q.correct_answer
+}
 
 export default function QuizView() {
-  const { id } = useParams<{ id: string }>()
+  const { id } = useParams()
+  const quizId = Number(id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const quizId = parseInt(id || '0')
+  const [open, setOpen] = useState<number | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const { data: quiz, isLoading } = useQuery({
-    queryKey: ['quiz', quizId],
-    queryFn: () => quizzesApi.get(quizId),
-    enabled: !!quizId,
-  })
+  const quiz = useQuery({ queryKey: ['quizzes', quizId], queryFn: () => quizzesApi.get(quizId), enabled: Number.isFinite(quizId) })
+  const attempts = useQuery({ queryKey: ['quizzes', quizId, 'attempts'], queryFn: () => quizzesApi.listAttempts(quizId), enabled: Number.isFinite(quizId) })
 
-  const { data: attempts } = useQuery({
-    queryKey: ['quiz-attempts', quizId],
-    queryFn: () => quizzesApi.listAttempts(quizId),
-    enabled: !!quizId,
-  })
-
-  const deleteMutation = useMutation({
+  const remove = useMutation({
     mutationFn: () => quizzesApi.delete(quizId),
     onSuccess: () => {
-      toast.success('Quiz deleted')
       queryClient.invalidateQueries({ queryKey: ['quizzes'] })
-      navigate('/dashboard')
+      queryClient.invalidateQueries({ queryKey: ['analytics'] })
+      toast.success('Quiz deleted')
+      navigate('/quizzes')
     },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
-  if (isLoading) {
+  if (quiz.isLoading) return <PageLoading />
+  if (quiz.isError || !quiz.data) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      <div className="page">
+        <Link to="/quizzes" className="back-link"><ArrowLeftIcon aria-hidden="true" /> Quizzes</Link>
+        <ErrorState message={errorMessage(quiz.error, 'This quiz couldn’t be found.')} onRetry={() => quiz.refetch()} />
       </div>
     )
   }
 
-  if (!quiz) {
-    return (
-      <div className="text-center py-12">
-        <ClipboardDocumentListIcon className="w-16 h-16 mx-auto text-gray-600 mb-4" />
-        <h2 className="text-xl font-semibold text-white">Quiz not found</h2>
-        <Link to="/dashboard" className="text-primary-400 mt-2 inline-block">
-          Return to Dashboard
-        </Link>
-      </div>
-    )
-  }
+  const q = quiz.data
+  const completed = (attempts.data ?? []).filter((a) => a.is_completed)
+  const best = completed.length ? Math.max(...completed.map((a) => a.score ?? 0)) : null
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center text-gray-400 hover:text-white mb-4"
-        >
-          <ArrowLeftIcon className="w-4 h-4 mr-2" />
-          Back to Dashboard
-        </Link>
+    <Page>
+      <Link to="/quizzes" className="back-link"><ArrowLeftIcon aria-hidden="true" /> Quizzes</Link>
 
-        <div className="flex items-start justify-between">
-          <div className="flex items-center">
-            <ClipboardDocumentListIcon className="w-12 h-12 text-green-400" />
-            <div className="ml-4">
-              <h1 className="text-2xl font-bold text-white">{quiz.title}</h1>
-              {quiz.description && (
-                <p className="text-gray-400">{quiz.description}</p>
-              )}
-            </div>
+      <motion.section className="card card--accent" style={{ padding: 'var(--space-xl)', borderRadius: 26 }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE_OUT }}>
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="min-w-0">
+            <h1 style={{ fontSize: 'clamp(1.5rem, 1.1rem + 1.2vw, 2.1rem)' }}>{q.name}</h1>
+            <p style={{ marginTop: 8, opacity: 0.85 }}>
+              {q.question_count} questions{q.time_limit_minutes ? `, ${q.time_limit_minutes} minute limit` : ', no time limit'}, pass mark {q.pass_percentage}%
+            </p>
           </div>
+          {q.question_count > 0 && (
+            <Link to={`/quizzes/${q.id}/take`} className="btn btn--light btn--lg"><PlayIcon aria-hidden="true" /> {completed.length ? 'Take it again' : 'Start the quiz'}</Link>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-8" style={{ marginTop: 24 }}>
+          <div><div className="stat__value" style={{ color: 'inherit', margin: 0 }}><CountUp value={completed.length} /></div><div className="small" style={{ opacity: 0.8 }}>Attempts</div></div>
+          <div><div className="stat__value" style={{ color: 'inherit', margin: 0 }}>{best != null ? <CountUp value={Math.round(best)} suffix="%" /> : '–'}</div><div className="small" style={{ opacity: 0.8 }}>Best score</div></div>
+        </div>
+      </motion.section>
 
-          <button
-            onClick={() => deleteMutation.mutate()}
-            className="btn-danger"
-            title="Delete quiz"
-          >
-            <TrashIcon className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="card bg-gray-800 border-gray-700 p-4 text-center">
-          <p className="text-3xl font-bold text-white">{quiz.question_count}</p>
-          <p className="text-sm text-gray-400">Questions</p>
-        </div>
-        <div className="card bg-gray-800 border-gray-700 p-4 text-center">
-          <p className="text-3xl font-bold text-white">{quiz.attempts_count}</p>
-          <p className="text-sm text-gray-400">Attempts</p>
-        </div>
-        <div className="card bg-gray-800 border-gray-700 p-4 text-center">
-          <p className="text-3xl font-bold text-green-400">
-            {quiz.best_score !== null ? `${quiz.best_score}%` : '-'}
-          </p>
-          <p className="text-sm text-gray-400">Best Score</p>
-        </div>
-        <div className="card bg-gray-800 border-gray-700 p-4 text-center">
-          <p className="text-3xl font-bold text-blue-400">
-            {quiz.time_limit_minutes || '∞'}
-          </p>
-          <p className="text-sm text-gray-400">Minutes</p>
-        </div>
-      </div>
-
-      {/* Start quiz button */}
-      <Link
-        to={`/quizzes/${quizId}/take`}
-        className="card p-6 mb-6 flex items-center justify-between bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg transition-shadow border-0"
-      >
-        <div>
-          <h2 className="text-xl font-bold">Start Quiz</h2>
-          <p className="text-green-100">
-            {quiz.question_count} questions • {quiz.pass_percentage}% to pass
-          </p>
-        </div>
-        <PlayIcon className="w-12 h-12" />
-      </Link>
-
-      {/* Previous attempts */}
-      {attempts && attempts.length > 0 && (
-        <div className="card bg-gray-800 border-gray-700">
-          <div className="p-4 border-b border-gray-700">
-            <h2 className="font-semibold text-white">Previous Attempts</h2>
-          </div>
-          <div className="divide-y divide-gray-700">
-            {attempts.map((attempt) => (
-              <div key={attempt.id} className="p-4 flex items-center justify-between">
-                <div className="flex items-center">
-                  <div
-                    className={clsx(
-                      'w-10 h-10 rounded-full flex items-center justify-center',
-                      attempt.percentage && attempt.percentage >= quiz.pass_percentage
-                        ? 'bg-green-900/50'
-                        : 'bg-red-900/50'
-                    )}
-                  >
-                    <TrophyIcon
-                      className={clsx(
-                        'w-5 h-5',
-                        attempt.percentage && attempt.percentage >= quiz.pass_percentage
-                          ? 'text-green-400'
-                          : 'text-red-400'
-                      )}
-                    />
+      {completed.length > 0 && (
+        <section className="section">
+          <SectionTitle title="Your attempts" />
+          <Stagger className="card list">
+            {completed.map((a) => {
+              const pct = Math.round(a.score ?? 0)
+              const passed = pct >= q.pass_percentage
+              return (
+                <Item key={a.id} className="list-row">
+                  <div className="figure-font" style={{ fontSize: '1.5rem', fontWeight: 300, minWidth: 64, color: 'var(--color-ink)' }}>{pct}%</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="row-title small">{a.correct_count} of {q.question_count} correct</div>
+                    <div className="row-meta">{relativeDate(a.time_completed)}, took {duration(a.time_spent_seconds)}</div>
                   </div>
-                  <div className="ml-3">
-                    <p className="font-medium text-white">
-                      {attempt.percentage}% ({attempt.correct_count}/{attempt.total_questions})
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      {new Date(attempt.started_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                {attempt.time_spent_seconds && (
-                  <div className="flex items-center text-gray-400">
-                    <ClockIcon className="w-4 h-4 mr-1" />
-                    {Math.floor(attempt.time_spent_seconds / 60)}m {attempt.time_spent_seconds % 60}s
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+                  <span className={`badge ${passed ? 'badge--success' : 'badge--error'}`}>{passed ? 'Passed' : 'Below pass mark'}</span>
+                </Item>
+              )
+            })}
+          </Stagger>
+        </section>
       )}
 
-      {/* Questions preview */}
-      <div className="card bg-gray-800 border-gray-700 mt-6">
-        <div className="p-4 border-b border-gray-700">
-          <h2 className="font-semibold text-white">
-            Questions ({quiz.questions?.length || 0})
-          </h2>
-        </div>
-        <div className="divide-y divide-gray-700">
-          {quiz.questions?.map((question, index) => (
-            <div key={question.id} className="p-4">
-              <div className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center text-sm font-medium text-gray-300">
-                  {index + 1}
-                </span>
-                <div>
-                  <p className="text-gray-200">{question.question_text}</p>
-                  <span
-                    className={clsx(
-                      'inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded',
-                      question.question_type === 'multiple_choice' && 'bg-blue-900 text-blue-300',
-                      question.question_type === 'true_false' && 'bg-purple-900 text-purple-300',
-                      question.question_type === 'fill_blank' && 'bg-orange-900 text-orange-300',
-                      question.question_type === 'short_answer' && 'bg-green-900 text-green-300'
+      <section className="section">
+        <SectionTitle title="Questions" action={<span className="small muted">Tap a question to see its answer</span>} />
+        {q.questions.length === 0 ? (
+          <div className="card"><EmptyState icon={<PlayIcon />} title="No questions in this quiz" /></div>
+        ) : (
+          <Stagger className="grid gap-2">
+            {q.questions.map((question, i) => {
+              const isOpen = open === question.id
+              return (
+                <Item key={question.id} className="card">
+                  <button type="button" className="w-full text-left flex items-start gap-3" style={{ padding: 16, background: 'none', border: 0, cursor: 'pointer' }} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : question.id)}>
+                    <span className="option__key" style={{ marginTop: 1 }}>{i + 1}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="row-title block">{question.question_text}</span>
+                      <span className="row-meta block">{QUESTION_TYPE_LABEL[question.question_type] ?? question.question_type}{question.topic ? `, ${question.topic}` : ''}</span>
+                    </span>
+                    <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ display: 'inline-flex', color: 'var(--color-muted)' }}>
+                      <ChevronDownIcon style={{ width: 18, height: 18 }} aria-hidden="true" />
+                    </motion.span>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.12 } }} transition={{ duration: 0.25, ease: EASE_OUT }}>
+                        <div className="notice notice--success" style={{ margin: '0 16px 16px 58px' }}>
+                          <span><strong>Answer:</strong> {answerText(question)}{question.explanation ? <span className="muted"> {question.explanation}</span> : null}</span>
+                        </div>
+                      </motion.div>
                     )}
-                  >
-                    {question.question_type.replace('_', ' ')}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                  </AnimatePresence>
+                </Item>
+              )
+            })}
+          </Stagger>
+        )}
+      </section>
+
+      <div className="section">
+        <Button size="sm" variant="ghost" icon={<TrashIcon />} onClick={() => setConfirmDelete(true)}>Delete quiz</Button>
       </div>
-    </div>
+
+      <ConfirmDialog open={confirmDelete} title="Delete this quiz?" body="The quiz, its questions and every attempt will be deleted."
+        confirmLabel="Delete quiz" loading={remove.isPending} onConfirm={() => remove.mutate()} onClose={() => setConfirmDelete(false)} />
+    </Page>
   )
 }

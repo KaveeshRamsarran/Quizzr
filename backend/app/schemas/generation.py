@@ -16,7 +16,7 @@ class DeckGenerationRequest(BaseModel):
 
     # Frontend compatibility
     title: Optional[str] = None
-    card_count: Optional[int] = Field(default=None, ge=5, le=200)
+    card_count: Optional[int] = Field(default=None, ge=3, le=200)
     card_types: Optional[List[str]] = None  # basic|cloze|reverse (frontend)
     focus_topics: Optional[List[str]] = None
     
@@ -31,7 +31,7 @@ class DeckGenerationRequest(BaseModel):
     topics: Optional[List[str]] = None  # Filter by topics
     
     # Generation settings
-    max_cards: int = Field(default=20, ge=5, le=200)
+    max_cards: int = Field(default=20, ge=3, le=200)
     difficulty: str = Field(default="mixed")  # easy, medium, hard, mixed
     include_eli5: bool = False  # Include ELI5 explanations
     include_examples: bool = True
@@ -65,8 +65,9 @@ class DeckGenerationRequest(BaseModel):
         # card_types -> include_* toggles (only if caller provided card_types)
         if self.card_types:
             normalized = {ct.lower() for ct in self.card_types}
-            # Basic/cloze are the only ones supported explicitly by the current generator.
-            self.include_basic = "basic" in normalized
+            self.include_basic = "basic" in normalized or "reverse" in normalized
+            self.include_definitions = "basic" in normalized
+            self.include_concepts = "basic" in normalized
             self.include_cloze = "cloze" in normalized
         return self
 
@@ -91,7 +92,7 @@ class QuizGenerationRequest(BaseModel):
     topics: Optional[List[str]] = None
     
     # Generation settings
-    question_count: int = Field(default=10, ge=5, le=50)
+    question_count: int = Field(default=10, ge=3, le=50)
     difficulty: str = Field(default="mixed")  # easy, medium, hard, mixed
     
     # Question type toggles
@@ -124,6 +125,8 @@ class QuizGenerationRequest(BaseModel):
             self.include_true_false = "true_false" in normalized
             self.include_fill_blank = "fill_blank" in normalized
             self.include_short_answer = "short_answer" in normalized
+            self.include_multi_select = False
+            self.include_matching = False
         return self
 
 
@@ -138,10 +141,13 @@ class GenerationJobResponse(BaseModel):
     """Frontend-compatible generation job response"""
 
     job_id: int
+    job_type: Optional[str] = None
     status: GenerationJobStatus
     message: Optional[str] = None
+    step: Optional[str] = None
     progress: Optional[float] = None
     result_id: Optional[int] = None
+    document_id: Optional[int] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
 

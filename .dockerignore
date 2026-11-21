@@ -1,0 +1,9 @@
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+**/uploads
+**/*.db*
+backend/.secret_key
+.git
+.hallmark

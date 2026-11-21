@@ -7,7 +7,7 @@ from app.models.course import Course
 from app.models.document import Document, DocumentPage, Chunk
 from app.models.deck import Deck, Card, CardType
 from app.models.quiz import Quiz, QuizQuestion, QuestionType, QuizAttempt, QuizAttemptAnswer
-from app.models.spaced_repetition import SpacedRepetitionSchedule
+from app.models.spaced_repetition import SpacedRepetitionSchedule, CardReviewLog
 from app.models.tag import Tag, CardTag, QuestionTag
 from app.models.job import ProcessingJob, JobLog, JobStatus, JobType
 
@@ -27,6 +27,7 @@ __all__ = [
     "QuizAttempt",
     "QuizAttemptAnswer",
     "SpacedRepetitionSchedule",
+    "CardReviewLog",
     "Tag",
     "CardTag",
     "QuestionTag",

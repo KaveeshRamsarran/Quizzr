@@ -7,7 +7,7 @@ from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, event
 
 from app.config import settings
 
@@ -34,23 +34,33 @@ def get_async_database_url(url: str) -> str:
     """Convert postgresql:// to postgresql+asyncpg:// or handle sqlite"""
     if url.startswith("postgresql://"):
         return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if url.startswith("sqlite:///"):
+        return url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
     return url
 
 
 # Check if using SQLite
-is_sqlite = settings.database_url.startswith("sqlite")
+is_sqlite = get_async_database_url(settings.database_url).startswith("sqlite")
 
 # Create async engine with appropriate settings
 if is_sqlite:
     engine = create_async_engine(
         get_async_database_url(settings.database_url),
-        echo=settings.debug,
-        connect_args={"check_same_thread": False},
+        echo=False,
+        connect_args={"check_same_thread": False, "timeout": 30},
     )
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _sqlite_pragmas(dbapi_connection, _record):  # pragma: no cover - driver hook
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 else:
     engine = create_async_engine(
         get_async_database_url(settings.database_url),
-        echo=settings.debug,
+        echo=False,
         pool_pre_ping=True,
         pool_size=10,
         max_overflow=20,

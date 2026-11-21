@@ -26,7 +26,7 @@ from app.schemas.document import (
 )
 from app.services.document import DocumentService
 from app.routers.dependencies import get_current_user
-from app.tasks import process_document_task
+from app.services import jobs
 
 router = APIRouter(tags=["Documents"])
 
@@ -62,17 +62,15 @@ async def upload_document(
         select(func.sum(Document.file_size)).where(Document.user_id == current_user.id)
     )
     current_usage = total_size.scalar() or 0
-    
-    max_storage = 500 * 1024 * 1024  # 500MB for free users
-    if current_user.role == "premium":
-        max_storage = 5 * 1024 * 1024 * 1024  # 5GB for premium
-    
-    if current_usage + file_size > max_storage:
+    if current_usage + file_size > settings.storage_quota_mb * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Storage quota exceeded"
+            detail=f"Storage quota of {settings.storage_quota_mb} MB exceeded. Delete a document to make room."
         )
-    
+
+    if file_size == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The file is empty.")
+
     # Verify course belongs to user if provided
     if course_id:
         result = await session.execute(
@@ -90,7 +88,11 @@ async def upload_document(
     
     # Read file content
     content = await file.read()
-    file.file.seek(0)
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That file isn't a valid PDF."
+        )
     
     # Generate filename and compute hash
     filename = doc_service.generate_filename(file.filename, current_user.id)
@@ -106,6 +108,7 @@ async def upload_document(
         file_path=file_path,
         file_size=file_size,
         file_hash=file_hash,
+        title=os.path.splitext(file.filename)[0][:255],
         status=DocumentStatus.PENDING
     )
     
@@ -113,40 +116,21 @@ async def upload_document(
     await session.commit()
     await session.refresh(document)
     
-    # Create processing job
+    # Create processing job and run it in the background
     job = ProcessingJob(
         user_id=current_user.id,
         job_type=JobType.PDF_EXTRACTION,
         document_id=document.id,
         status=JobStatus.PENDING,
-        parameters={
-            "ocr_enabled": settings.ocr_enabled,
-            "ocr_threshold": settings.ocr_text_threshold,
-        },
     )
     session.add(job)
     await session.commit()
     await session.refresh(job)
-    
-    # Run processing (local dev uses celery_mock which executes synchronously)
-    try:
-        result = process_document_task.delay(job.id)
-        if getattr(result, "state", "SUCCESS") == "FAILURE":
-            job.status = JobStatus.FAILED
-            job.error_message = str(getattr(result, "result", "Task failed"))
-            document.status = DocumentStatus.FAILED
-            document.processing_error = job.error_message
-            await session.commit()
-        else:
-            # Processing writes via a separate sync session; reload document to reflect results
-            await session.refresh(document)
-    except Exception as e:
-        job.status = JobStatus.FAILED
-        job.error_message = f"Failed to run task: {str(e)}"
-        document.status = DocumentStatus.FAILED
-        document.processing_error = job.error_message
-        await session.commit()
-    
+
+    await jobs.schedule(jobs.run_document_job, job.id)
+    if jobs.run_inline:
+        await session.refresh(document)
+
     return DocumentResponse.model_validate(document)
 
 
@@ -175,7 +159,7 @@ async def list_documents(
     
     if search:
         query = query.where(
-            Document.filename.ilike(f"%{search}%") |
+            Document.original_filename.ilike(f"%{search}%") |
             Document.title.ilike(f"%{search}%")
         )
     
@@ -436,7 +420,7 @@ async def reprocess_document(
             detail="Document not found"
         )
     
-    if document.status not in [DocumentStatus.ERROR, DocumentStatus.FAILED, DocumentStatus.PROCESSED]:
+    if document.status not in [DocumentStatus.ERROR, DocumentStatus.FAILED, DocumentStatus.PROCESSED, DocumentStatus.COMPLETED]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Document cannot be reprocessed in current state"
@@ -453,18 +437,15 @@ async def reprocess_document(
         job_type=JobType.PDF_EXTRACTION,
         document_id=document.id,
         status=JobStatus.PENDING,
-        parameters={
-            "reprocess": True,
-            "ocr_enabled": settings.ocr_enabled,
-            "ocr_threshold": settings.ocr_text_threshold,
-        },
+        parameters={"reprocess": True},
     )
     session.add(job)
     await session.commit()
     await session.refresh(job)
     await session.refresh(document)
-    
-    # Queue processing
-    process_document_task.delay(job.id)
-    
+
+    await jobs.schedule(jobs.run_document_job, job.id)
+    if jobs.run_inline:
+        await session.refresh(document)
+
     return DocumentResponse.model_validate(document)

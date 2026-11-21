@@ -1,347 +1,302 @@
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import {
-  DocumentIcon,
-  ArrowLeftIcon,
-  SparklesIcon,
-  TrashIcon,
-} from '@heroicons/react/24/outline'
-import { documentsApi, generationApi } from '../lib/api'
-import clsx from 'clsx'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { useEffect, useMemo, useState } from 'react'
-import { useAuthStore } from '../stores/authStore'
-import type { GenerationJob } from '../types'
+import {
+  ArrowLeftIcon, ArrowPathIcon, ExclamationCircleIcon, PencilIcon, QuestionMarkCircleIcon, RectangleStackIcon, TrashIcon,
+} from '@heroicons/react/24/outline'
+import { decksApi, documentsApi, errorMessage, generationApi, quizzesApi } from '../lib/api'
+import { fileSize, shortDate } from '../lib/format'
+import { Button, ConfirmDialog, Dialog, ErrorState, Field, PageLoading, SectionTitle, StatusBadge, Tabs } from '../components/ui'
+import { EASE_OUT, Item, Page, ProgressBar, Stagger } from '../components/motion'
+import GenerateDialog from '../components/GenerateDialog'
+
+type Tab = 'sections' | 'text' | 'pdf'
 
 export default function DocumentView() {
-  const { id } = useParams<{ id: string }>()
+  const { id } = useParams()
+  const documentId = Number(id)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const accessToken = useAuthStore((s) => s.accessToken)
-  const documentId = parseInt(id || '0')
+  const [params, setParams] = useSearchParams()
+  const tab = (params.get('tab') as Tab) || 'sections'
+  const make = params.get('make') as 'deck' | 'quiz' | null
+  const lastKind = useRef<'deck' | 'quiz'>('deck')
+  if (make) lastKind.current = make
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
-  const [generationType, setGenerationType] = useState<'deck' | 'quiz' | null>(null)
-  const [generationJob, setGenerationJob] = useState<GenerationJob | null>(null)
-
-  const { data: document, isLoading } = useQuery({
-    queryKey: ['document', documentId],
+  const doc = useQuery({
+    queryKey: ['documents', documentId],
     queryFn: () => documentsApi.get(documentId),
-    enabled: !!documentId,
-  })
-
-  const { data: jobStatus } = useQuery({
-    queryKey: ['generation-job', generationJob?.job_id],
-    queryFn: () => generationApi.getJobStatus(generationJob!.job_id),
-    enabled: !!generationJob,
-    refetchInterval: (query) => {
-      const status = (query.state.data as GenerationJob | undefined)?.status ?? generationJob?.status
-      return status && ['completed', 'failed'].includes(status) ? false : 2000
+    enabled: Number.isFinite(documentId),
+    refetchInterval: (q) => {
+      const s = q.state.data?.status
+      return s === 'pending' || s === 'processing' ? 1500 : false
     },
   })
+  const decks = useQuery({ queryKey: ['decks', 'list', { document_id: documentId }], queryFn: () => decksApi.list({ document_id: documentId, limit: 100 }) })
+  const quizzes = useQuery({ queryKey: ['quizzes', 'list', { document_id: documentId }], queryFn: () => quizzesApi.list({ document_id: documentId, limit: 100 }) })
+  const jobs = useQuery({
+    queryKey: ['jobs', { document_id: documentId }],
+    queryFn: () => generationApi.listJobs({ document_id: documentId, limit: 10 }),
+    refetchInterval: (q) => (q.state.data?.some((j) => j.status === 'pending' || j.status === 'processing') ? 1000 : false),
+  })
 
-  const currentJob = jobStatus || generationJob
+  const running = jobs.data?.filter((j) => j.status === 'pending' || j.status === 'processing') ?? []
+  const prevRunning = useRef(0)
+  useEffect(() => {
+    if (prevRunning.current > running.length) {
+      queryClient.invalidateQueries({ queryKey: ['decks'] })
+      queryClient.invalidateQueries({ queryKey: ['quizzes'] })
+    }
+    prevRunning.current = running.length
+  }, [running.length, queryClient])
+
+  const setParam = (key: string, value: string | null) => {
+    const p = new URLSearchParams(params)
+    if (value) p.set(key, value)
+    else p.delete(key)
+    setParams(p, { replace: true })
+  }
 
   useEffect(() => {
-    if (currentJob?.status !== 'completed' || !currentJob.result_id) return
-    const resultPath = generationType === 'deck'
-      ? `/decks/${currentJob.result_id}`
-      : `/quizzes/${currentJob.result_id}`
-    const t = window.setTimeout(() => navigate(resultPath), 800)
-    return () => window.clearTimeout(t)
-  }, [currentJob?.status, currentJob?.result_id, generationType, navigate])
+    if (tab !== 'pdf' || pdfUrl || !doc.data) return
+    let url: string | null = null
+    documentsApi.fileBlob(documentId)
+      .then((blob) => { url = URL.createObjectURL(blob); setPdfUrl(url) })
+      .catch((err) => setPdfError(errorMessage(err, 'The original PDF couldn’t be loaded.')))
+    return () => { if (url) URL.revokeObjectURL(url) }
+  }, [tab, pdfUrl, doc.data, documentId])
 
-  const deleteMutation = useMutation({
+  const remove = useMutation({
     mutationFn: () => documentsApi.delete(documentId),
-    onSuccess: async () => {
-      toast.success('Document deleted')
-      await queryClient.invalidateQueries({ queryKey: ['documents'] })
-      navigate('/documents')
-    },
-    onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Failed to delete document')
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['documents'] }); toast.success('Document deleted'); navigate('/documents') },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+  const reprocess = useMutation({
+    mutationFn: () => documentsApi.reprocess(documentId),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['documents', documentId] }); toast.success('Reading the document again') },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+  const rename = useMutation({
+    mutationFn: () => documentsApi.update(documentId, { title: newTitle.trim() }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['documents'] }); setRenaming(false) },
+    onError: (err) => toast.error(errorMessage(err)),
   })
 
-  const generateDeckMutation = useMutation({
-    mutationFn: () => generationApi.generateDeck({ document_id: documentId, card_count: 10 }),
-    onSuccess: (job) => {
-      setGenerationType('deck')
-      setGenerationJob(job)
-      toast.success('Deck generation started')
-    },
-    onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Deck generation failed')
-    },
-  })
-
-  const generateQuizMutation = useMutation({
-    mutationFn: () => generationApi.generateQuiz({ document_id: documentId, question_count: 10 }),
-    onSuccess: (job) => {
-      setGenerationType('quiz')
-      setGenerationJob(job)
-      toast.success('Quiz generation started')
-    },
-    onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } } }
-      toast.error(err.response?.data?.detail || 'Quiz generation failed')
-    },
-  })
-
-  const canGenerate = useMemo(() => {
-    const status = (document as any)?.status
-    return status === 'processed' || status === 'completed'
-  }, [document])
-
-  const loadPdf = async () => {
-    if (!accessToken) {
-      toast.error('Not authenticated')
-      return
-    }
-    
-    try {
-      // Fetch the PDF with authentication
-      const res = await fetch(`/api/v1/documents/${documentId}/file`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-      
-      if (!res.ok) {
-        throw new Error(`Failed to load PDF (${res.status})`)
-      }
-      
-      // Create a blob URL and open it in a new tab
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank', 'noopener,noreferrer')
-      
-      // Clean up the blob URL after a delay
-      setTimeout(() => URL.revokeObjectURL(url), 60000) // 1 minute
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to load PDF')
-    }
-  }
-
-  if (isLoading) {
+  if (doc.isLoading) return <PageLoading />
+  if (doc.isError || !doc.data) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      <div className="page">
+        <Link to="/documents" className="back-link"><ArrowLeftIcon aria-hidden="true" /> Documents</Link>
+        <ErrorState message={errorMessage(doc.error, 'This document couldn’t be found.')} onRetry={() => doc.refetch()} />
       </div>
     )
   }
 
-  if (!document) {
-    return (
-      <div className="text-center py-12">
-        <DocumentIcon className="w-16 h-16 mx-auto text-gray-600 mb-4" />
-        <h2 className="text-xl font-semibold text-white">Document not found</h2>
-        <Link to="/dashboard" className="text-primary-400 mt-2 inline-block">
-          Return to Dashboard
-        </Link>
-      </div>
-    )
-  }
-
-  const statusColors = {
-    pending: 'bg-yellow-900 text-yellow-300',
-    processing: 'bg-blue-900 text-blue-300',
-    processed: 'bg-green-900 text-green-300',
-    error: 'bg-red-900 text-red-300',
-  }
+  const d = doc.data
+  const title = d.title || d.original_filename
+  const ready = d.status === 'processed'
+  const busy = d.status === 'pending' || d.status === 'processing'
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center text-gray-400 hover:text-white mb-4"
-        >
-          <ArrowLeftIcon className="w-4 h-4 mr-2" />
-          Back to Dashboard
-        </Link>
-        
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center">
-            <DocumentIcon className="w-12 h-12 text-primary-400" />
-            <div className="ml-4">
-              <h1 className="text-2xl font-bold text-white">
-                {document.title || document.filename}
-              </h1>
-              <p className="text-gray-400">
-                {document.original_filename}
-              </p>
-            </div>
+    <Page>
+      <Link to="/documents" className="back-link"><ArrowLeftIcon aria-hidden="true" /> Documents</Link>
+      <header className="page-header">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="min-w-0">{title}</h1>
+            <StatusBadge status={d.status} />
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                const ok = window.confirm('Delete this document? This cannot be undone.')
-                if (!ok) return
-                deleteMutation.mutate()
-              }}
-              disabled={deleteMutation.isPending}
-              className="btn-secondary"
-            >
-              <TrashIcon className="w-5 h-5 mr-2 text-red-400" />
-              Delete
-            </button>
-            <span
-              className={clsx(
-                'px-3 py-1 rounded-full text-sm font-medium',
-                statusColors[document.status as keyof typeof statusColors]
-              )}
-            >
-              {document.status}
-            </span>
-          </div>
+          <p className="page-header__sub">{d.page_count} {d.page_count === 1 ? 'page' : 'pages'}, {fileSize(d.file_size)}, uploaded {shortDate(d.created_at)}</p>
         </div>
-      </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" size="sm" icon={<PencilIcon />} onClick={() => { setNewTitle(title); setRenaming(true) }}>Rename</Button>
+          <Button variant="ghost" size="sm" icon={<TrashIcon />} onClick={() => setConfirmDelete(true)}>Delete</Button>
+        </div>
+      </header>
 
-      {/* Document info */}
-      <div className="card bg-gray-800 border-gray-700 p-6 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Document Details</h2>
-        <dl className="grid grid-cols-2 gap-4">
-          <div>
-            <dt className="text-sm text-gray-400">Pages</dt>
-            <dd className="text-lg font-medium text-white">
-              {document.page_count || 'Unknown'}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm text-gray-400">File Size</dt>
-            <dd className="text-lg font-medium text-white">
-              {(document.file_size / 1024).toFixed(1)} KB
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm text-gray-400">Uploaded</dt>
-            <dd className="text-lg font-medium text-white">
-              {new Date(document.created_at).toLocaleDateString()}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm text-gray-400">Type</dt>
-            <dd className="text-lg font-medium text-white">
-              {document.mime_type}
-            </dd>
-          </div>
-        </dl>
-
-        {document.description && (
-          <div className="mt-4 pt-4 border-t border-gray-700">
-            <dt className="text-sm text-gray-400 mb-1">Description</dt>
-            <dd className="text-gray-200">{document.description}</dd>
-          </div>
+      <AnimatePresence>
+        {busy && (
+          <motion.div className="card card--pad" style={{ marginBottom: 24 }} aria-live="polite" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <p className="row-title">Reading your PDF…</p>
+            <div style={{ marginTop: 12 }}><ProgressBar value={d.status === 'processing' ? 70 : 30} label="Processing progress" /></div>
+          </motion.div>
         )}
-
-        <div className="mt-6 pt-4 border-t border-gray-700 flex items-center gap-3">
-          <button
-            onClick={() => loadPdf()}
-            className="btn-primary"
-          >
-            View PDF in New Tab
-          </button>
+      </AnimatePresence>
+      {d.status === 'error' && (
+        <div className="notice notice--error items-center" role="alert" style={{ marginBottom: 24 }}>
+          <ExclamationCircleIcon aria-hidden="true" />
+          <span className="flex-1">{d.error_message || 'This PDF couldn’t be read.'}</span>
+          <Button size="sm" onClick={() => reprocess.mutate()} loading={reprocess.isPending} icon={<ArrowPathIcon />}>Try again</Button>
         </div>
+      )}
+
+      {ready && (
+        <Stagger className="grid gap-3 sm:grid-cols-2" >
+          {([
+            ['deck', RectangleStackIcon, 'Make flashcards', 'Definitions and fill-the-gap cards to review over time.'],
+            ['quiz', QuestionMarkCircleIcon, 'Make a quiz', 'Multiple choice, true or false and short answers.'],
+          ] as const).map(([kind, Icon, label, text]) => (
+            <Item key={kind}>
+              <button type="button" className={`card card-link text-left w-full ${kind === 'deck' ? 'card--accent' : ''}`} style={{ padding: 22, border: 0, cursor: 'pointer', height: '100%' }} onClick={() => setParam('make', kind)}>
+                <div className="flex items-center gap-4">
+                  <div className="icon-tile" style={kind === 'deck' ? { background: 'color-mix(in oklab, var(--color-accent-ink) 20%, transparent)', color: 'var(--color-accent-ink)' } : undefined}><Icon aria-hidden="true" /></div>
+                  <div>
+                    <h3 style={kind === 'deck' ? { color: 'var(--color-accent-ink)' } : undefined}>{label}</h3>
+                    <p className="small" style={{ opacity: kind === 'deck' ? 0.85 : 1, color: kind === 'deck' ? undefined : 'var(--color-muted)' }}>{text}</p>
+                  </div>
+                </div>
+              </button>
+            </Item>
+          ))}
+        </Stagger>
+      )}
+
+      <AnimatePresence>
+        {running.length > 0 && (
+          <motion.div className="card card--pad section" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            {running.map((j) => (
+              <div key={j.job_id}>
+                <p className="small"><strong className="row-title">{j.job_type === 'quiz_generation' ? 'Quiz' : 'Flashcards'}</strong> <span className="muted">{j.step || 'Queued'}…</span></p>
+                <div style={{ marginTop: 8 }}><ProgressBar value={j.progress ?? 5} label="Generation progress" /></div>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid gap-x-8 lg:grid-cols-[minmax(0,1fr)_320px] section">
+        <section aria-label="Document contents" className="min-w-0">
+          <Tabs<Tab>
+            label="Document views"
+            value={tab}
+            onChange={(v) => setParam('tab', v === 'sections' ? null : v)}
+            options={[
+              { value: 'sections', label: <>Sections <span className="badge" style={{ height: 20 }}>{d.chunks.length}</span></> },
+              { value: 'text', label: 'Text' },
+              { value: 'pdf', label: 'Original PDF' },
+            ]}
+          />
+          <AnimatePresence mode="wait">
+            <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: EASE_OUT }}>
+              {tab === 'sections' && (
+                d.chunks.length === 0 ? (
+                  <p className="muted">{busy ? 'Sections appear here once the text has been read.' : 'No readable text was found.'}</p>
+                ) : (
+                  <Stagger className="grid gap-3">
+                    {d.chunks.map((c) => (
+                      <Item key={c.id} className="card" >
+                        <div style={{ padding: 18 }}>
+                          <div className="flex items-start justify-between gap-3">
+                            <h3 className="min-w-0">{c.heading_context || `Section ${c.chunk_index + 1}`}</h3>
+                            <span className="badge">{c.start_page === c.end_page ? `Page ${c.start_page}` : `Pages ${c.start_page} to ${c.end_page}`}</span>
+                          </div>
+                          <p className="small muted" style={{ marginTop: 6 }}>{c.content.replace(/^# .*$/gm, '').replace(/\s+/g, ' ').trim().slice(0, 180)}…</p>
+                          {!!c.key_terms?.length && (
+                            <div className="chips" style={{ marginTop: 10 }}>
+                              {c.key_terms.slice(0, 5).map((t) => <span key={t} className="badge badge--accent">{t}</span>)}
+                            </div>
+                          )}
+                        </div>
+                      </Item>
+                    ))}
+                  </Stagger>
+                )
+              )}
+
+              {tab === 'text' && (
+                <div className="card card--pad">
+                  {d.pages.length ? d.pages.map((p) => (
+                    <article key={p.id} className="reader-page" aria-label={`Page ${p.page_number}`}>
+                      <span className="badge" style={{ marginBottom: 10 }}>Page {p.page_number}{p.used_ocr ? ', read by OCR' : ''}</span>
+                      <p className="reader-page__text">{p.text_content?.trim() || 'No text on this page.'}</p>
+                    </article>
+                  )) : <p className="muted">No text yet.</p>}
+                </div>
+              )}
+
+              {tab === 'pdf' && (
+                pdfError ? <ErrorState message={pdfError} onRetry={() => { setPdfError(null); setPdfUrl(null) }} />
+                  : pdfUrl ? <iframe title={`${title} (PDF)`} src={pdfUrl} className="pdf-frame" />
+                  : <div className="skeleton" style={{ height: 480, borderRadius: 18 }} aria-label="Loading PDF" />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </section>
+
+        <aside className="min-w-0">
+          <SectionTitle title="Made from this document" />
+          {(decks.data?.decks.length || quizzes.data?.quizzes.length) ? (
+            <Stagger className="card list">
+              {decks.data?.decks.map((deck) => (
+                <Item key={`d${deck.id}`} className="list-row list-row--link" onClick={() => navigate(`/decks/${deck.id}`)}>
+                  <RectangleStackIcon aria-hidden="true" style={{ width: 20, height: 20, flex: 'none', color: 'var(--color-accent-text)' }} />
+                  <Link to={`/decks/${deck.id}`} className="row-title truncate flex-1 small" onClick={(e) => e.stopPropagation()}>{deck.name}</Link>
+                  <span className="tiny muted">{deck.card_count} cards</span>
+                </Item>
+              ))}
+              {quizzes.data?.quizzes.map((q) => (
+                <Item key={`q${q.id}`} className="list-row list-row--link" onClick={() => navigate(`/quizzes/${q.id}`)}>
+                  <QuestionMarkCircleIcon aria-hidden="true" style={{ width: 20, height: 20, flex: 'none', color: 'var(--color-accent-text)' }} />
+                  <Link to={`/quizzes/${q.id}`} className="row-title truncate flex-1 small" onClick={(e) => e.stopPropagation()}>{q.name}</Link>
+                  <span className="tiny muted">{q.question_count} questions</span>
+                </Item>
+              ))}
+            </Stagger>
+          ) : (
+            <div className="card card--soft" style={{ padding: 18 }}>
+              <p className="small muted">Nothing yet. {ready ? 'Make flashcards or a quiz above.' : ''}</p>
+            </div>
+          )}
+          {jobs.data?.some((j) => j.status === 'failed') && (
+            <div className="section">
+              <SectionTitle title="Didn’t work" />
+              {jobs.data.filter((j) => j.status === 'failed').slice(0, 3).map((j) => (
+                <div key={j.job_id} className="notice notice--error" style={{ marginBottom: 8 }}>
+                  <ExclamationCircleIcon aria-hidden="true" /><span>{j.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {ready && (
+            <div className="section">
+              <Button size="sm" variant="ghost" icon={<ArrowPathIcon />} onClick={() => reprocess.mutate()} loading={reprocess.isPending}>Read the PDF again</Button>
+            </div>
+          )}
+        </aside>
       </div>
 
-      {/* Actions */}
-      {canGenerate && !generationJob && (
-        <div className="grid md:grid-cols-2 gap-4">
-          <button
-            onClick={() => generateDeckMutation.mutate()}
-            disabled={generateDeckMutation.isPending || generateQuizMutation.isPending}
-            className="card bg-gray-800 border-gray-700 p-6 text-left hover:border-primary-500 hover:shadow-md transition-all disabled:opacity-50"
-          >
-            <div className="flex items-center mb-3">
-              <div className="p-2 bg-purple-900/50 rounded-lg">
-                <SparklesIcon className="w-5 h-5 text-purple-400" />
-              </div>
-              <h3 className="ml-3 font-semibold text-white">
-                Generate Flashcards
-              </h3>
-            </div>
-            <p className="text-sm text-gray-400">
-              Generate a deck directly from this document (fast mode).
-            </p>
-          </button>
-
-          <button
-            onClick={() => generateQuizMutation.mutate()}
-            disabled={generateDeckMutation.isPending || generateQuizMutation.isPending}
-            className="card bg-gray-800 border-gray-700 p-6 text-left hover:border-primary-500 hover:shadow-md transition-all disabled:opacity-50"
-          >
-            <div className="flex items-center mb-3">
-              <div className="p-2 bg-green-900/50 rounded-lg">
-                <SparklesIcon className="w-5 h-5 text-green-400" />
-              </div>
-              <h3 className="ml-3 font-semibold text-white">
-                Generate Quiz
-              </h3>
-            </div>
-            <p className="text-sm text-gray-400">
-              Generate a quiz directly from this document (fast mode).
-            </p>
-          </button>
-        </div>
+      {ready && (
+        <GenerateDialog kind={make ?? lastKind.current} open={!!make} onClose={() => setParam('make', null)} documentId={documentId} documentTitle={title} />
       )}
 
-      {currentJob && currentJob.status !== 'completed' && currentJob.status !== 'failed' && (
-        <div className="card bg-gray-800 border-gray-700 p-6 mt-6">
-          <div className="flex items-center mb-4">
-            <div className="w-5 h-5 mr-3 animate-spin rounded-full border-b-2 border-primary-400" />
-            <h3 className="font-medium text-white">
-              Generating {generationType === 'deck' ? 'Flashcards' : 'Quiz'}...
-            </h3>
+      <Dialog open={renaming} onClose={() => setRenaming(false)} title="Rename document">
+        <form onSubmit={(e) => { e.preventDefault(); if (newTitle.trim()) rename.mutate() }}>
+          <Field label="Title" htmlFor="doc-title">
+            <input id="doc-title" className="input" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} maxLength={255} data-autofocus />
+          </Field>
+          <div className="dialog__actions">
+            <Button onClick={() => setRenaming(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" loading={rename.isPending} disabled={!newTitle.trim()}>Save</Button>
           </div>
-          <div className="w-full bg-gray-700 rounded-full h-2">
-            <div
-              className="bg-primary-500 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${currentJob.progress ?? 10}%` }}
-            />
-          </div>
-          <p className="mt-2 text-sm text-gray-400">
-            Status: <span className="font-medium">{currentJob.status}</span>
-            {typeof currentJob.progress === 'number' ? ` • ${currentJob.progress}%` : ''}
-            {currentJob.job_id ? ` • Job #${currentJob.job_id}` : ''}
-          </p>
-          <p className="mt-1 text-sm text-gray-400">
-            {currentJob.message || 'Working… this can take a bit depending on the PDF.'}
-          </p>
-        </div>
-      )}
+        </form>
+      </Dialog>
 
-      {currentJob?.status === 'failed' && (
-        <div className="card bg-red-900/30 border-red-800 p-6 mt-6">
-          <h3 className="font-medium text-red-300">Generation Failed</h3>
-          <p className="text-sm text-red-400 mt-1">{currentJob.message || 'An error occurred.'}</p>
-          <button
-            onClick={() => {
-              setGenerationJob(null)
-              setGenerationType(null)
-            }}
-            className="btn-secondary mt-4"
-          >
-            Try Again
-          </button>
-        </div>
-      )}
-
-      {document.status === 'error' && (
-        <div className="card bg-red-900/30 border-red-800 p-6">
-          <h3 className="font-medium text-red-300 mb-2">Processing Error</h3>
-          <p className="text-red-400">{document.error_message}</p>
-          <button
-            onClick={() => documentsApi.reprocess(document.id)}
-            className="btn-secondary mt-4"
-          >
-            Retry Processing
-          </button>
-        </div>
-      )}
-    </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this document?"
+        body="The PDF and its text will be deleted. Flashcards and quizzes made from it are kept."
+        confirmLabel="Delete document"
+        loading={remove.isPending}
+        onConfirm={() => remove.mutate()}
+        onClose={() => setConfirmDelete(false)}
+      />
+    </Page>
   )
 }
