@@ -7,6 +7,8 @@ import axios from 'axios'
 import { MotionConfig } from 'framer-motion'
 import App from './App'
 import { applyThemeMode, getThemeMode, watchSystemTheme } from './lib/theme'
+import { loadAuthConfig } from './lib/supabase'
+import { initAuth } from './lib/auth'
 import './index.css'
 
 applyThemeMode(getThemeMode())
@@ -26,6 +28,8 @@ const queryClient = new QueryClient({
   },
 })
 
+// Learn how this server signs people in (and restore any Supabase session) before rendering.
+function render() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
@@ -54,3 +58,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 )
+}
+
+loadAuthConfig().then(initAuth).catch(() => undefined).finally(render)

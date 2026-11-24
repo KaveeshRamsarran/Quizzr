@@ -34,7 +34,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    
+    # Supabase Auth user id (the token's "sub"); set when sign-in is handled by Supabase.
+    supabase_id: Mapped[Optional[str]] = mapped_column(String(64), unique=True, index=True, nullable=True)
+
     # Profile
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     school: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

@@ -5,11 +5,12 @@ Handles PDF upload and document management
 
 import os
 import uuid
+from urllib.parse import quote
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -26,7 +27,7 @@ from app.schemas.document import (
 )
 from app.services.document import DocumentService
 from app.routers.dependencies import get_current_user
-from app.services import jobs
+from app.services import jobs, storage
 
 router = APIRouter(tags=["Documents"])
 
@@ -97,7 +98,13 @@ async def upload_document(
     # Generate filename and compute hash
     filename = doc_service.generate_filename(file.filename, current_user.id)
     file_hash = doc_service.compute_file_hash(content)
-    file_path = await doc_service.save_file(content, filename)
+    try:
+        file_path = await doc_service.save_file(content, filename)
+    except storage.StorageError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Couldn’t store the file right now. Try uploading it again in a moment.",
+        )
     
     # Create document record
     document = Document(
@@ -256,55 +263,26 @@ async def get_document_file(
             detail="Document not found",
         )
 
-    stored_path = document.file_path
-    if not stored_path:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        )
+    if not document.file_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
-    # Resolve to an absolute on-disk path.
-    # If the stored path is relative, treat it as relative to upload_dir.
-    # Be tolerant of legacy DB values that already include an 'uploads/' prefix.
-    base_dir = os.path.abspath(settings.upload_dir)
-    upload_dir_name = os.path.basename(base_dir.rstrip("\\/"))
-    backend_root = os.path.abspath(os.path.join(base_dir, os.pardir))
-
-    candidate_path = stored_path.strip()
-    if os.path.isabs(candidate_path):
-        abs_path = os.path.abspath(candidate_path)
-    else:
-        normalized = candidate_path.replace("/", os.sep).replace("\\", os.sep)
-        if normalized == upload_dir_name or normalized.startswith(upload_dir_name + os.sep):
-            # stored_path already includes 'uploads/...'
-            abs_path = os.path.abspath(os.path.join(backend_root, normalized))
-        else:
-            abs_path = os.path.abspath(os.path.join(base_dir, normalized))
-
-    if not os.path.exists(abs_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        )
-
-    # Path safety: ensure file is under upload_dir (normalized, Windows-safe).
     try:
-        if os.path.commonpath([abs_path, base_dir]) != base_dir:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid file path",
-            )
-    except ValueError:
+        stream = await storage.open_stream(document.file_path)
+    except storage.StorageError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file path",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Couldn’t load the file right now. Try again in a moment.",
         )
+    if stream is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
-    return FileResponse(
-        path=abs_path,
+    # Header values must be latin-1; send the real name RFC 5987-encoded alongside.
+    name = document.original_filename or "document.pdf"
+    ascii_name = name.encode("ascii", "replace").decode().replace('"', "'")
+    return StreamingResponse(
+        stream,
         media_type="application/pdf",
-        filename=document.original_filename,
-        headers={"Content-Disposition": f'inline; filename="{document.original_filename}"'},
+        headers={"Content-Disposition": f"inline; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}"},
     )
 
 
@@ -386,11 +364,7 @@ async def delete_document(
         )
     
     # Delete file from storage
-    if document.file_path and os.path.exists(document.file_path):
-        try:
-            os.remove(document.file_path)
-        except OSError:
-            pass  # File may already be deleted
+    await storage.delete(document.file_path)
     
     # Delete document record (cascades to pages and chunks)
     await session.delete(document)

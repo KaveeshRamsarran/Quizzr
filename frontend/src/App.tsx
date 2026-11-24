@@ -7,6 +7,10 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const AuthCallback = lazy(() => import('./pages/AuthCallback'))
+
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Upload = lazy(() => import('./pages/Upload'))
 const Documents = lazy(() => import('./pages/Documents'))
@@ -43,6 +47,9 @@ const TITLES: [RegExp, string][] = [
   [/^\/settings/, 'Settings'],
   [/^\/login/, 'Sign in'],
   [/^\/register/, 'Create an account'],
+  [/^\/forgot-password/, 'Reset your password'],
+  [/^\/reset-password/, 'Choose a new password'],
+  [/^\/auth\/callback/, 'Signing in'],
 ]
 
 function useDocumentTitle() {
@@ -62,6 +69,10 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+        {/* Links from Supabase emails and OAuth sign-in land here; they sign the user in themselves. */}
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />

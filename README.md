@@ -11,7 +11,7 @@ Upload a PDF, and Quizzr reads it and splits it into study sections. From there 
 - **Quizzes:** multiple choice, true or false, fill in the blank and short answer, with an optional time limit. Feedback is given per question, and results are broken down by topic. Short-answer grading tolerates typos.
 - **Spaced repetition:** SM-2 scheduling. Each session shows due cards first, then cards you haven't studied. A card rated Again comes back before the session ends.
 - **Progress:** streaks, study time, daily activity, card mastery, quiz topics (weakest first) and the questions you miss most.
-- **Accounts:** email and password, guest accounts that can be upgraded later, profile, password change and account deletion.
+- **Accounts:** sign-up with email confirmation, sign-in, password reset by email, optional Google or GitHub sign-in, guest accounts that can be upgraded later without losing work, profile, password change and account deletion. Handled by Supabase Auth when it is configured, and by Quizzr's own email and password accounts otherwise.
 - **Light and dark mode.**
 
 ### How the cards are made
@@ -60,6 +60,23 @@ Run `npm run build` in `frontend/`. The API then serves the built app at http://
 ## Configuration
 
 Copy `.env.example` to `.env` (in the repo root or in `backend/`). Every setting is optional. If `SECRET_KEY` is not set, a random key is generated and stored in `backend/.secret_key`.
+
+## Deploying with Supabase
+
+Supabase can host both the database and sign-in. With `SUPABASE_URL` and `SUPABASE_ANON_KEY` set, the web app signs people in through Supabase Auth and the API accepts only Supabase tokens. Each Supabase user gets a Quizzr profile the first time they sign in. Without those two settings, Quizzr keeps using its own accounts, so local use still needs no setup.
+
+1. **Keys.** In Project Settings > API Keys, copy the project URL into `SUPABASE_URL` and the anon (or publishable) key into `SUPABASE_ANON_KEY`. The anon key is public by design; the app sends it to the browser. Put the service_role (or secret) key in `SUPABASE_SERVICE_ROLE_KEY`. It is only ever used on the server, so never expose it. With it set:
+   - Uploaded PDFs are stored in Supabase Storage. Quizzr creates a private `documents` bucket on startup, or the bucket named in `SUPABASE_STORAGE_BUCKET`. Only the server can read the bucket, and it streams each file to its owner. Without this key, PDFs are saved to `UPLOAD_DIR`, which Render wipes on every deploy and restart.
+   - Deleting an account also deletes its Supabase sign-in and its stored files.
+2. **Database.** Under Connect, copy the **Session pooler** connection string, fill in the database password, and set it as `DATABASE_URL`. Render can't reach the direct connection host, which is IPv6 only. The transaction pooler (port 6543) works too. Tables are created on first start. Row level security is switched on for each one, so the public anon key can't read them through Supabase's Data API. Quizzr's own connection is unaffected.
+3. **Redirect URLs.** In Authentication > URL Configuration, set Site URL to your app's address (for example `https://quizzr.onrender.com`). Add `https://quizzr.onrender.com/**` and `http://localhost:3000/**` to Redirect URLs. Confirmation, password reset and Google sign-in links return to `/auth/callback` and `/reset-password`.
+4. **Sign-in options.** In Authentication > Sign In / Providers:
+   - Keep Email enabled, with **Confirm email** on.
+   - Turn on **Allow anonymous sign-ins** for the "Continue as a guest" button.
+   - For Google or GitHub, enable the provider there, then list it in `SUPABASE_OAUTH_PROVIDERS` (for example `google,github`).
+5. **Email delivery.** Supabase's built-in mailer only sends to your project team's own addresses, a few per hour. Before real users sign up, add a custom SMTP provider under Authentication > Emails > SMTP Settings (Resend, Postmark, SES and others work). Until then, confirmation and reset emails won't reach anyone else.
+
+Accounts created with Quizzr's own sign-in before the switch are kept. When someone signs up in Supabase with the same email and confirms it, their existing documents and decks are linked to the new sign-in.
 
 ## Project layout
 

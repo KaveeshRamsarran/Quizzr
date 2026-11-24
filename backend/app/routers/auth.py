@@ -17,12 +17,30 @@ from app.schemas.user import (
     TokenResponse, TokenRefresh, PasswordChange
 )
 from app.services.auth import AuthService
-from app.routers.dependencies import get_current_user, security
+from app.config import settings
+from app.routers.dependencies import get_current_user, require_builtin_auth, security
+from app.services import supabase_auth
 
 router = APIRouter(tags=["Authentication"])
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.get("/config")
+async def auth_config():
+    """
+    How the web app should sign people in. With Supabase configured it returns the
+    project URL and the public anon key (both safe to expose) for supabase-js.
+    """
+    if not settings.supabase_enabled:
+        return {"provider": "builtin"}
+    return {
+        "provider": "supabase",
+        "supabase_url": settings.supabase_base_url,
+        "supabase_anon_key": settings.supabase_anon_key,
+        "oauth_providers": settings.supabase_oauth_providers_list,
+    }
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_builtin_auth)])
 async def register(
     user_data: UserCreate,
     session: AsyncSession = Depends(get_session)
@@ -60,7 +78,7 @@ async def register(
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(require_builtin_auth)])
 async def login(
     credentials: UserLogin,
     request: Request,
@@ -95,7 +113,7 @@ async def login(
     )
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(require_builtin_auth)])
 async def refresh_token(
     token_data: TokenRefresh,
     session: AsyncSession = Depends(get_session)
@@ -117,7 +135,7 @@ async def refresh_token(
     return result
 
 
-@router.post("/guest", response_model=TokenResponse)
+@router.post("/guest", response_model=TokenResponse, dependencies=[Depends(require_builtin_auth)])
 async def create_guest(
     session: AsyncSession = Depends(get_session)
 ):
@@ -181,6 +199,11 @@ async def update_current_user(
         current_user.name = user_data.name
 
     if user_data.email is not None and user_data.email != current_user.email:
+        if settings.supabase_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Change your email from Settings so it can be confirmed.",
+            )
         auth_service = AuthService(session)
         existing = await auth_service.get_user_by_email(user_data.email)
         if existing:
@@ -214,7 +237,7 @@ async def update_current_user(
     return UserResponse.model_validate(current_user)
 
 
-@router.post("/change-password")
+@router.post("/change-password", dependencies=[Depends(require_builtin_auth)])
 async def change_password(
     password_data: PasswordChange,
     current_user: User = Depends(get_current_user),
@@ -252,24 +275,22 @@ async def delete_current_user(
     """
     Permanently delete the current account, its documents, decks, quizzes and history
     """
-    import os
     from sqlalchemy import select as _select
     from app.models.document import Document
+    from app.services import storage
+
+    if settings.supabase_enabled and current_user.supabase_id:
+        await supabase_auth.delete_supabase_user(current_user.supabase_id)
 
     paths = (await session.execute(
         _select(Document.file_path).where(Document.user_id == current_user.id)
     )).scalars().all()
     await session.delete(current_user)
     await session.commit()
-    for path in paths:
-        try:
-            if path and os.path.exists(path):
-                os.remove(path)
-        except OSError:
-            pass
+    await storage.delete_many(list(paths))
 
 
-@router.post("/convert-guest", response_model=TokenResponse)
+@router.post("/convert-guest", response_model=TokenResponse, dependencies=[Depends(require_builtin_auth)])
 async def convert_guest_to_user(
     user_data: UserCreate,
     current_user: User = Depends(get_current_user),

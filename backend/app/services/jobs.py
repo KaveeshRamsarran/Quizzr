@@ -9,7 +9,6 @@ No Redis, Celery or separate worker is needed.
 from __future__ import annotations
 
 import asyncio
-import os
 from datetime import datetime
 from typing import Callable, Coroutine, Set
 
@@ -17,12 +16,11 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models.document import Chunk, Document, DocumentPage, ProcessingStatus
 from app.models.job import JobLog, JobStatus, JobType, ProcessingJob
 from app.schemas.generation import DeckGenerationRequest, QuizGenerationRequest
-from app.services import pdf_processing
+from app.services import pdf_processing, storage
 
 logger = structlog.get_logger()
 
@@ -49,14 +47,6 @@ async def wait_for_all() -> None:
     """Await every running job (used on shutdown and in tests)."""
     while _tasks:
         await asyncio.gather(*list(_tasks), return_exceptions=True)
-
-
-def resolve_upload_path(stored_path: str) -> str:
-    if os.path.isabs(stored_path):
-        return stored_path
-    base = os.path.abspath(settings.upload_dir)
-    candidate = os.path.join(base, os.path.basename(stored_path))
-    return candidate
 
 
 # --------------------------------------------------------------------------- #
@@ -113,11 +103,11 @@ async def run_document_job(job_id: int) -> None:
             document.processing_error = None
             await session.commit()
 
-            path = resolve_upload_path(document.file_path)
-            if not os.path.exists(path):
-                raise ValueError("The uploaded file is missing from storage. Upload it again.")
-
-            data = await asyncio.to_thread(_process_pdf, path)
+            # Files in Supabase Storage are downloaded to a temporary copy for reading.
+            async with storage.local_copy(document.file_path) as path:
+                if path is None:
+                    raise ValueError("The uploaded file is missing from storage. Upload it again.")
+                data = await asyncio.to_thread(_process_pdf, path)
 
             job.current_step = "Saving pages"
             job.progress = 70

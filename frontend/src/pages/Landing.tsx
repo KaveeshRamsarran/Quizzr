@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { ArrowPathIcon, ArrowRightIcon, ArrowUpTrayIcon, CheckIcon, SparklesIcon } from '@heroicons/react/24/outline'
-import { authApi, errorMessage } from '../lib/api'
+import { authErrorMessage, signInAsGuest } from '../lib/auth'
 import { useAuthStore } from '../stores/authStore'
 import { Brand, Button } from '../components/ui'
 import { EASE_OUT, Reveal } from '../components/motion'
@@ -74,18 +74,17 @@ function DemoCard() {
 }
 
 export default function Landing() {
-  const { isAuthenticated, login } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const navigate = useNavigate()
   const [guestLoading, setGuestLoading] = useState(false)
 
   const tryAsGuest = async () => {
     setGuestLoading(true)
     try {
-      const data = await authApi.loginAsGuest()
-      login(data.user, data.access_token, data.refresh_token)
+      await signInAsGuest()
       navigate('/upload')
     } catch (error) {
-      toast.error(errorMessage(error))
+      toast.error(authErrorMessage(error))
     } finally {
       setGuestLoading(false)
     }

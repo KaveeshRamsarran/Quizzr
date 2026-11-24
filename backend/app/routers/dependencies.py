@@ -10,8 +10,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.config import settings
 from app.database import get_session
 from app.models.user import User, UserRole
+from app.services import supabase_auth
 from app.services.auth import AuthService
 
 security = HTTPBearer(auto_error=False)
@@ -32,9 +34,28 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"}
         )
     
+    if settings.supabase_enabled:
+        try:
+            claims = await supabase_auth.verify_supabase_token(credentials.credentials)
+        except supabase_auth.AuthUnavailable:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Sign-in is temporarily unavailable. Try again in a moment.",
+            )
+        if not claims:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        user = await supabase_auth.get_or_create_user(session, claims)
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
+        return user
+
     auth_service = AuthService(session)
     payload = auth_service.verify_access_token(credentials.credentials)
-    
+
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -68,6 +89,15 @@ async def get_current_user(
         )
     
     return user
+
+
+def require_builtin_auth() -> None:
+    """For the built-in password endpoints, which are off when Supabase handles sign-in."""
+    if settings.supabase_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sign-in is handled by Supabase on this server.",
+        )
 
 
 async def get_current_user_optional(

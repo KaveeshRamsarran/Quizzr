@@ -57,6 +57,18 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 30
 
+    # Supabase Auth. When SUPABASE_URL and SUPABASE_ANON_KEY are set, sign-up, sign-in,
+    # email confirmation and password reset are handled by Supabase and the API accepts
+    # Supabase access tokens. Otherwise Quizzr uses its own email/password accounts.
+    supabase_url: str = ""
+    supabase_anon_key: str = ""  # public "anon"/"publishable" key, sent to the browser
+    supabase_jwt_secret: str = ""  # only for projects still on the legacy HS256 JWT secret
+    supabase_service_role_key: str = ""  # optional: lets account deletion remove the Supabase user too
+    supabase_oauth_providers: str = ""  # e.g. "google,github" (enable them in Supabase first)
+    # With SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY set, uploaded PDFs are kept in this
+    # private Supabase Storage bucket (created on startup) instead of UPLOAD_DIR.
+    supabase_storage_bucket: str = "documents"
+
     # File upload
     max_upload_size_mb: int = 50
     upload_dir: str = str(BACKEND_DIR / "uploads")
@@ -78,6 +90,18 @@ class Settings(BaseSettings):
     @property
     def allowed_extensions_list(self) -> List[str]:
         return [ext.strip().lower() for ext in self.allowed_extensions.split(",")]
+
+    @property
+    def supabase_enabled(self) -> bool:
+        return bool(self.supabase_url and self.supabase_anon_key)
+
+    @property
+    def supabase_base_url(self) -> str:
+        return self.supabase_url.rstrip("/")
+
+    @property
+    def supabase_oauth_providers_list(self) -> List[str]:
+        return [p.strip().lower() for p in self.supabase_oauth_providers.split(",") if p.strip()]
 
     @property
     def cors_origins(self) -> List[str]:

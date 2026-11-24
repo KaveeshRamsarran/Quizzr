@@ -15,9 +15,9 @@ import structlog
 import os
 
 from app.config import settings
-from app.database import engine, Base
+from app.database import engine, Base, upgrade_schema
 import app.models  # noqa: F401  (register every table before create_all)
-from app.services import jobs
+from app.services import jobs, storage
 from app.routers import auth, documents, generation, decks, quizzes, analytics, admin
 
 
@@ -58,9 +58,15 @@ async def lifespan(app: FastAPI):
     # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
-    logger.info("Database tables created/verified")
+        await conn.run_sync(upgrade_schema)
 
+    logger.info(
+        "Database tables created/verified",
+        auth="supabase" if settings.supabase_enabled else "built-in",
+        file_storage="supabase" if storage.uses_supabase() else "local",
+    )
+
+    await storage.ensure_bucket()
     await jobs.recover_interrupted_jobs()
 
     yield

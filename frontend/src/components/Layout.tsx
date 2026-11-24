@@ -5,7 +5,7 @@ import {
   ArrowRightOnRectangleIcon, ChartBarIcon, DocumentTextIcon, HomeIcon, PlusIcon, QuestionMarkCircleIcon, RectangleStackIcon, Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '../stores/authStore'
-import { authApi } from '../lib/api'
+import { signOut as endSession } from '../lib/auth'
 import { Brand, Button } from './ui'
 import { initials } from '../lib/format'
 
@@ -18,14 +18,13 @@ const NAV = [
 ]
 
 export default function Layout() {
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { pathname } = useLocation()
 
   const signOut = async () => {
-    await authApi.logout()
-    logout()
+    await endSession()
     queryClient.clear()
     navigate('/')
   }

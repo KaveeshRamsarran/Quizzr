@@ -2,8 +2,9 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { ComputerDesktopIcon, MoonIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
-import { authApi, errorMessage } from '../lib/api'
+import { ComputerDesktopIcon, EnvelopeIcon, MoonIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
+import { authApi } from '../lib/api'
+import { authErrorMessage, changeEmail, changePassword, deleteAccount as removeAccount, upgradeGuest, usesSupabase } from '../lib/auth'
 import { getCardsPerSession, getThemeMode, setCardsPerSession, setThemeMode, type ThemeMode } from '../lib/theme'
 import { useAuthStore } from '../stores/authStore'
 import { Button, ConfirmDialog, Field, PageHeader, Segmented } from '../components/ui'
@@ -23,7 +24,9 @@ function Panel({ id, title, sub, children }: { id?: string; title: string; sub?:
 }
 
 export default function Settings() {
-  const { user, updateUser, login, logout } = useAuthStore()
+  const { user, updateUser } = useAuthStore()
+  const supabaseMode = usesSupabase()
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -53,11 +56,25 @@ export default function Settings() {
     e.preventDefault()
     setSavingProfile(true)
     try {
-      const updated = await authApi.updateMe({ name: name.trim(), email: email.trim(), school: school.trim() || null })
+      const newEmail = email.trim()
+      const emailChanged = newEmail.toLowerCase() !== user?.email.toLowerCase()
+      // With Supabase, the new address only takes effect once it is confirmed by email.
+      const confirmByEmail = supabaseMode && emailChanged
+      const updated = await authApi.updateMe({
+        name: name.trim(),
+        school: school.trim() || null,
+        ...(confirmByEmail ? {} : { email: newEmail }),
+      })
       updateUser(updated)
-      toast.success('Profile saved')
+      if (confirmByEmail) {
+        await changeEmail(newEmail)
+        setEmail(updated.email)
+        toast.success(`Saved. Open the link we sent to ${newEmail} to confirm your new email.`, { duration: 8000 })
+      } else {
+        toast.success('Profile saved')
+      }
     } catch (err) {
-      toast.error(errorMessage(err))
+      toast.error(authErrorMessage(err))
     } finally {
       setSavingProfile(false)
     }
@@ -69,12 +86,12 @@ export default function Settings() {
     if (newPassword.length < 8) { setPasswordError('Use at least 8 characters.'); return }
     setSavingPassword(true)
     try {
-      await authApi.changePassword(currentPassword, newPassword)
+      await changePassword(currentPassword, newPassword)
       setCurrentPassword('')
       setNewPassword('')
       toast.success('Password changed')
     } catch (err) {
-      setPasswordError(errorMessage(err))
+      setPasswordError(authErrorMessage(err))
     } finally {
       setSavingPassword(false)
     }
@@ -85,13 +102,18 @@ export default function Settings() {
     if (convertPassword.length < 8) { toast.error('Use a password of at least 8 characters.'); return }
     setConverting(true)
     try {
-      const data = await authApi.convertGuest(convertEmail.trim(), convertPassword, convertName.trim())
-      login(data.user, data.access_token, data.refresh_token)
-      setName(data.user.name)
-      setEmail(data.user.email)
-      toast.success('Account saved')
+      const { pending } = await upgradeGuest(convertEmail.trim(), convertPassword, convertName.trim())
+      if (pending) {
+        setPendingEmail(convertEmail.trim())
+        setConvertPassword('')
+      } else {
+        const saved = useAuthStore.getState().user
+        setName(saved?.name ?? '')
+        setEmail(saved?.email ?? '')
+        toast.success('Account saved')
+      }
     } catch (err) {
-      toast.error(errorMessage(err))
+      toast.error(authErrorMessage(err))
     } finally {
       setConverting(false)
     }
@@ -100,13 +122,12 @@ export default function Settings() {
   const deleteAccount = async () => {
     setDeleting(true)
     try {
-      await authApi.deleteAccount()
-      logout()
+      await removeAccount()
       queryClient.clear()
       navigate('/')
       toast.success('Account deleted')
     } catch (err) {
-      toast.error(errorMessage(err))
+      toast.error(authErrorMessage(err))
       setDeleting(false)
     }
   }
@@ -128,12 +149,22 @@ export default function Settings() {
 
         {user.is_guest ? (
           <Panel id="account" title="Keep your work" sub="Add an email and password to keep your documents, decks and history.">
+            {pendingEmail ? (
+              <div className="notice notice--accent" role="status">
+                <EnvelopeIcon aria-hidden="true" />
+                <span>
+                  Almost there. Open the link we sent to <strong>{pendingEmail}</strong> to confirm it. Your work stays on this
+                  account. Afterwards, set a password here under Password.
+                </span>
+              </div>
+            ) : (
             <form onSubmit={convert} className="grid gap-4">
               <Field label="Name" htmlFor="cv-name"><input id="cv-name" className="input" autoComplete="name" value={convertName} onChange={(e) => setConvertName(e.target.value)} required /></Field>
               <Field label="Email" htmlFor="cv-email"><input id="cv-email" type="email" inputMode="email" autoComplete="email" className="input" value={convertEmail} onChange={(e) => setConvertEmail(e.target.value)} required /></Field>
               <Field label="Password" htmlFor="cv-password" help="At least 8 characters."><input id="cv-password" type="password" autoComplete="new-password" className="input" value={convertPassword} onChange={(e) => setConvertPassword(e.target.value)} required /></Field>
               <div><Button type="submit" variant="primary" loading={converting} disabled={!convertName.trim() || !convertEmail.trim() || !convertPassword}>Save my account</Button></div>
             </form>
+            )}
           </Panel>
         ) : (
           <Panel title="Profile">
@@ -196,14 +227,17 @@ Cards and quizzes are written on this computer from your own notes. It works off
           <Panel title="Password">
             <form onSubmit={savePassword} className="grid gap-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Current password" htmlFor="current-password">
-                  <input id="current-password" type="password" autoComplete="current-password" className="input" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-                </Field>
+                {/* Supabase already checked who this is at sign-in; built-in accounts confirm the old password. */}
+                {!supabaseMode && (
+                  <Field label="Current password" htmlFor="current-password">
+                    <input id="current-password" type="password" autoComplete="current-password" className="input" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+                  </Field>
+                )}
                 <Field label="New password" htmlFor="new-password" error={passwordError} help="At least 8 characters.">
                   <input id="new-password" type="password" autoComplete="new-password" className="input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} aria-invalid={!!passwordError} required />
                 </Field>
               </div>
-              <div><Button type="submit" loading={savingPassword} disabled={!currentPassword || !newPassword}>Change password</Button></div>
+              <div><Button type="submit" loading={savingPassword} disabled={(!supabaseMode && !currentPassword) || !newPassword}>{supabaseMode ? 'Set password' : 'Change password'}</Button></div>
             </form>
           </Panel>
         )}

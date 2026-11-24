@@ -1,5 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '../stores/authStore'
+import { supabase } from './supabase'
 import type {
   AnalyticsOverview,
   AnswerResult,
@@ -28,8 +29,11 @@ import type {
 
 export const api = axios.create({ baseURL: '/api/v1', timeout: 60_000 })
 
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
+api.interceptors.request.use(async (config) => {
+  // With Supabase, ask its client for the token: it refreshes it when it is about to expire.
+  const token = supabase
+    ? (await supabase.auth.getSession()).data.session?.access_token
+    : useAuthStore.getState().accessToken
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -38,6 +42,13 @@ api.interceptors.request.use((config) => {
 let refreshing: Promise<string | null> | null = null
 
 async function refreshAccessToken(): Promise<string | null> {
+  if (supabase) {
+    const { data } = await supabase.auth.refreshSession()
+    if (data.session) return data.session.access_token
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
+    useAuthStore.getState().logout()
+    return null
+  }
   const { refreshToken, login, logout } = useAuthStore.getState()
   if (!refreshToken) return null
   try {

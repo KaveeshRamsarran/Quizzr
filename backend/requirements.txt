@@ -12,7 +12,7 @@ aiosqlite>=0.21.0,<1
 asyncpg>=0.30.0; python_version < '3.14'
 
 # Authentication
-PyJWT>=2.9.0,<3
+PyJWT[crypto]>=2.9.0,<3   # crypto: verifies Supabase ES256/RS256 tokens
 bcrypt>=4.2.0,<6
 
 # PDF text extraction
